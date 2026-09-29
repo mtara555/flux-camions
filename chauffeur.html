@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101828">
+  <title>Réception — Chauffeur</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body.chauffeur { min-height: 100vh; }
+    .ch-tete { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #101828; color: #fff; }
+    .ch-tete h1 { margin: 0; font-size: 17px; flex: 1; }
+    .langue { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 10px; padding: 6px 12px; font-weight: 700; }
+    .ch main { max-width: 520px; }
+    .ch-carte { padding: 20px; display: grid; gap: 14px; text-align: center; }
+    .ch-num { font-size: 72px; font-weight: 900; line-height: 1; letter-spacing: -.02em; padding: 10px 20px; border-radius: 16px; margin: 0 auto; background: var(--neutre); font-variant-numeric: tabular-nums; }
+    .ch-num.FRAIS { background: var(--frais-clair); color: var(--frais); }
+    .ch-num.PGC { background: var(--pgc-clair); color: var(--pgc); }
+    .ch-etiquette { color: var(--texte-2); font-size: 15px; margin: 0; }
+    .ch-grand { font-size: 40px; font-weight: 800; margin: 0; font-variant-numeric: tabular-nums; }
+    .ch-infos { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--bord); margin: 0 -20px -20px; }
+    .ch-infos div { padding: 14px; }
+    .ch-infos div + div { border-inline-start: 1px solid var(--bord); }
+    .ch-infos b { display: block; font-size: 24px; }
+    .ch-tour { background: var(--ok); color: #fff; border-radius: 18px; padding: 24px 16px; text-align: center; display: grid; gap: 6px; animation: pulse 1.2s ease-in-out infinite; }
+    .ch-tour .t1 { font-size: 30px; font-weight: 900; }
+    .ch-tour .t2 { font-size: 22px; font-weight: 700; }
+    @keyframes pulse { 50% { transform: scale(1.02); } }
+    .ch-note { font-size: 14px; color: var(--texte-2); text-align: center; margin: 0; }
+    .ch-etat { padding: 16px; border-radius: 14px; text-align: center; font-weight: 700; }
+    .ch-etat.info { background: var(--attention-clair); color: var(--attention); }
+    .ch-etat.ok { background: var(--ok-clair); color: var(--ok); }
+    .ch-etat.neutre { background: var(--neutre); color: var(--texte); }
+    [dir=rtl] body, [dir=rtl] .champ input { text-align: right; }
+    [dir=rtl] #f-plaque { direction: ltr; text-align: right; }
+  </style>
+</head>
+<body class="chauffeur ch">
+  <header class="ch-tete">
+    <h1 data-t="titre">🚚 Réception marchandises</h1>
+    <button class="langue" id="btn-langue">عربي</button>
+  </header>
+
+  <main>
+    <!-- Enregistrement (QR du portail) -->
+    <form class="carte ch-carte" id="vue-inscription" hidden autocomplete="off">
+      <h2 style="margin:0" data-t="inscription">Prendre un numéro d'attente</h2>
+      <div class="champ" style="text-align:start">
+        <label for="f-plaque" data-t="plaque">Plaque du camion *</label>
+        <input id="f-plaque" type="text" required placeholder="12345-A-6" style="text-transform:uppercase">
+      </div>
+      <div class="champ" style="text-align:start">
+        <span class="etiquette" data-t="marchandise">Marchandise *</span>
+        <div class="choix type">
+          <input type="radio" name="type" id="t-frais" value="frais"><label for="t-frais" data-t="frais">❄️ FRAIS</label>
+          <input type="radio" name="type" id="t-pgc" value="pgc"><label for="t-pgc" data-t="pgc">📦 SEC / PGC</label>
+        </div>
+      </div>
+      <div class="champ" style="text-align:start">
+        <span class="etiquette" data-t="vehicule">Véhicule</span>
+        <div class="choix">
+          <input type="radio" name="taille" id="s-cam" value="camionnette"><label for="s-cam" data-t="camionnette">Camionnette</label>
+          <input type="radio" name="taille" id="s-por" value="porteur" checked><label for="s-por" data-t="porteur">Camion</label>
+          <input type="radio" name="taille" id="s-semi" value="semi"><label for="s-semi" data-t="semi">Semi-remorque</label>
+        </div>
+      </div>
+      <div class="champ" style="text-align:start">
+        <label for="f-fournisseur" data-t="fournisseur">Fournisseur / société</label>
+        <input id="f-fournisseur" type="text">
+      </div>
+      <div class="champ" style="text-align:start">
+        <label for="f-tel" data-t="tel">Téléphone (pour recevoir un SMS)</label>
+        <input id="f-tel" type="tel" inputmode="tel" placeholder="06 00 00 00 00" style="direction:ltr">
+      </div>
+      <button class="btn btn-principal btn-grand" type="submit" id="btn-inscrire" data-t="valider">Obtenir mon numéro</button>
+    </form>
+
+    <!-- Suivi -->
+    <div id="vue-suivi" hidden style="display:grid;gap:16px"></div>
+
+    <!-- Aucun lien -->
+    <div class="carte ch-carte" id="vue-vide" hidden>
+      <p style="font-size:48px;margin:0">📷</p>
+      <h2 style="margin:0" data-t="scanner">Scannez le QR code affiché au portail de la réception</h2>
+      <p class="ch-note" data-t="scanner2">ou présentez-vous à l'agent de sécurité.</p>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script>
+  // =====================================================================
+  //  PAGE CHAUFFEUR (sans compte) — enregistrement QR + suivi par jeton
+  // =====================================================================
+  const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+    db: { schema: CONFIG.SCHEMA }, auth: { persistSession: false }
+  });
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const memo = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+
+  // --- Traductions -----------------------------------------------------
+  const T = {
+    fr: {
+      titre: '🚚 Réception marchandises', inscription: "Prendre un numéro d'attente", plaque: 'Plaque du camion *',
+      marchandise: 'Marchandise *', frais: '❄️ FRAIS', pgc: '📦 SEC / PGC', vehicule: 'Véhicule', camionnette: 'Camionnette',
+      porteur: 'Camion', semi: 'Semi-remorque', fournisseur: 'Fournisseur / société', tel: 'Téléphone (pour recevoir un SMS)',
+      valider: 'Obtenir mon numéro', scanner: 'Scannez le QR code affiché au portail de la réception',
+      scanner2: "ou présentez-vous à l'agent de sécurité.", votreNum: "Votre numéro d'attente", entree: "Heure d'entrée estimée",
+      position: 'Position', quai: 'Quai', devant: (n) => n <= 1 ? 'Vous êtes le prochain' : `${n - 1} camion${n > 2 ? 's' : ''} devant vous`,
+      tour: "C'EST VOTRE TOUR !", allerQuai: (q) => `Présentez-vous au quai ${q}`, enReception: 'Réception en cours au quai',
+      termine: 'Réception terminée. Merci et bonne route !', annule: 'Numéro annulé. Adressez-vous au portail.',
+      reporte: (j, h) => `Réception fermée. Votre numéro est réservé pour le ${j} : présentez-vous dès ${h}, vous serez prioritaire.`,
+      attente: 'Restez dans le couloir extérieur. Cette page se met à jour toute seule.', choisir: 'Choisissez FRAIS ou SEC / PGC',
+      codeInvalide: 'QR code expiré. Demandez le nouveau QR au portail.', introuvable: 'Numéro introuvable.',
+      nouveau: 'Nouveau numéro', maj: 'Mis à jour à', FRAIS: 'FRAIS', PGC: 'PGC / NF', deja: 'Ce camion avait déjà un numéro.'
+    },
+    ar: {
+      titre: '🚚 استقبال البضائع', inscription: 'أخذ رقم الانتظار', plaque: 'رقم لوحة الشاحنة *',
+      marchandise: 'نوع البضاعة *', frais: '❄️ طازجة', pgc: '📦 جافة', vehicule: 'نوع المركبة', camionnette: 'شاحنة صغيرة',
+      porteur: 'شاحنة', semi: 'نصف مقطورة', fournisseur: 'المورد / الشركة', tel: 'الهاتف (لتلقي رسالة SMS)',
+      valider: 'الحصول على رقمي', scanner: 'امسح رمز QR المعروض عند بوابة الاستقبال',
+      scanner2: 'أو توجه إلى عون الأمن.', votreNum: 'رقم انتظارك', entree: 'وقت الدخول المتوقع',
+      position: 'الترتيب', quai: 'الرصيف', devant: (n) => n <= 1 ? 'أنت التالي' : `${n - 1} شاحنة قبلك`,
+      tour: 'حان دورك!', allerQuai: (q) => `توجه إلى الرصيف ${q}`, enReception: 'الاستلام جارٍ في الرصيف',
+      termine: 'انتهى الاستلام. شكراً وطريق السلامة!', annule: 'تم إلغاء الرقم. توجه إلى البوابة.',
+      reporte: (j, h) => `الاستقبال مغلق. رقمك محجوز ليوم ${j}: احضر ابتداءً من ${h} وستكون لك الأولوية.`,
+      attente: 'ابقَ في الممر الخارجي. هذه الصفحة تتحدث تلقائياً.', choisir: 'اختر طازجة أو جافة',
+      codeInvalide: 'رمز QR منتهي. اطلب الرمز الجديد من البوابة.', introuvable: 'الرقم غير موجود.',
+      nouveau: 'رقم جديد', maj: 'آخر تحديث', FRAIS: 'الطازجة', PGC: 'الجافة', deja: 'هذه الشاحنة لديها رقم مسبقاً.'
+    }
+  };
+  let L = memo.get('flux-langue') === 'ar' ? 'ar' : 'fr';
+  const t = (k, ...a) => { const v = T[L][k]; return typeof v === 'function' ? v(...a) : v; };
+  function appliquerLangue() {
+    document.documentElement.lang = L;
+    document.documentElement.dir = L === 'ar' ? 'rtl' : 'ltr';
+    document.querySelectorAll('[data-t]').forEach(el => { el.textContent = t(el.dataset.t); });
+    $('btn-langue').textContent = L === 'ar' ? 'Français' : 'عربي';
+    if (E.dernier) rendreSuivi(E.dernier);
+  }
+  $('btn-langue').addEventListener('click', () => { L = L === 'ar' ? 'fr' : 'ar'; memo.set('flux-langue', L); appliquerLangue(); });
+
+  // --- Utilitaires -----------------------------------------------------
+  const E = { token: null, dernier: null, minuteur: null, statutPrec: null };
+  const hhmm = (ts) => ts ? new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Casablanca' }).replace(':', 'h') : '—';
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const jourCourt = (d) => { const [y, m, j] = String(d).split('-'); return `${j}/${m}`; };
+  function afficher(vue) { ['vue-inscription', 'vue-suivi', 'vue-vide'].forEach(v => { $(v).hidden = v !== vue; }); }
+  function message(txt) {
+    const z = document.getElementById('toasts') || Object.assign(document.body.appendChild(document.createElement('div')), { id: 'toasts' });
+    const d = document.createElement('div'); d.className = 'toast toast-err'; d.textContent = txt; z.appendChild(d);
+    setTimeout(() => d.remove(), 5000);
+  }
+
+  // --- Enregistrement --------------------------------------------------
+  $('f-plaque').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase(); });
+  $('vue-inscription').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const type = f.querySelector('input[name=type]:checked')?.value;
+    if (!type) { message(t('choisir')); return; }
+    const btn = $('btn-inscrire'); btn.disabled = true;
+    try {
+      const { data, error } = await sb.rpc('fn_enregistrer_camion', {
+        p_plaque: $('f-plaque').value.trim(), p_type: type,
+        p_taille: f.querySelector('input[name=taille]:checked').value,
+        p_fournisseur: $('f-fournisseur').value.trim() || null,
+        p_telephone: $('f-tel').value.trim() || null,
+        p_source: 'qr', p_code: params.get('c')
+      });
+      if (error) throw error;
+      memo.set('flux-token', data.token);
+      if (data.deja_enregistre) setTimeout(() => message(t('deja')), 300);
+      history.replaceState(null, '', location.pathname + '?t=' + data.token);
+      demarrerSuivi(data.token);
+    } catch (err) {
+      message(/QR/.test(err.message) ? t('codeInvalide') : err.message);
+    } finally { btn.disabled = false; }
+  });
+
+  // --- Suivi -----------------------------------------------------------
+  async function actualiser() {
+    try {
+      const { data, error } = await sb.rpc('fn_suivi_chauffeur', { p_token: E.token });
+      if (error) throw error;
+      if (!data.trouve) { afficher('vue-vide'); message(t('introuvable')); clearInterval(E.minuteur); return; }
+      if (E.statutPrec && E.statutPrec !== 'appele' && data.statut === 'appele' && navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
+      E.statutPrec = data.statut;
+      E.dernier = data;
+      rendreSuivi(data);
+      if (['termine', 'annule'].includes(data.statut)) clearInterval(E.minuteur);
+    } catch (e) { /* réseau coupé : on réessaie au prochain tour */ }
+  }
+
+  function rendreSuivi(d) {
+    const quai = d.quai || d.piste;
+    const libQuai = quai ? t(quai) : '';
+    let bloc = '';
+    if (d.statut === 'attente') {
+      bloc = `
+        <div class="carte ch-carte">
+          <p class="ch-etiquette">${t('votreNum')}</p>
+          <div class="ch-num ${esc(d.piste)}">${esc(d.numero)}</div>
+          <p class="ch-etiquette">${t('entree')}</p>
+          <p class="ch-grand">${esc(d.heure_estimee_txt || hhmm(d.heure_estimee))}</p>
+          <div class="ch-infos">
+            <div><span class="ch-etiquette">${t('position')}</span><b>${d.position ?? '—'}</b><span class="ch-etiquette">${t('devant', d.position || 1)}</span></div>
+            <div><span class="ch-etiquette">${t('quai')}</span><b>${libQuai}</b><span class="ch-etiquette" style="direction:ltr;display:block">${esc(d.plaque)}</span></div>
+          </div>
+        </div>
+        <p class="ch-note">${t('attente')}</p>`;
+    } else if (d.statut === 'appele') {
+      bloc = `
+        <div class="ch-tour"><span class="t1">${t('tour')}</span><span class="ch-num" style="background:rgba(255,255,255,.2);color:#fff">${esc(d.numero)}</span><span class="t2">${t('allerQuai', libQuai)}</span></div>`;
+    } else if (d.statut === 'en_reception') {
+      bloc = `<div class="carte ch-carte"><div class="ch-num ${esc(d.quai)}">${esc(d.numero)}</div><div class="ch-etat ok">${t('enReception')} ${libQuai}</div></div>`;
+    } else if (d.statut === 'reporte') {
+      bloc = `<div class="carte ch-carte"><p class="ch-etiquette">${t('votreNum')}</p><div class="ch-num ${esc(d.piste)}">${esc(d.numero)}</div>
+              <div class="ch-etat info">${t('reporte', jourCourt(d.jour), esc(d.heure_estimee_txt || '07h00'))}</div></div>`;
+    } else {
+      bloc = `<div class="carte ch-carte"><div class="ch-num">${esc(d.numero)}</div>
+              <div class="ch-etat ${d.statut === 'termine' ? 'ok' : 'neutre'}">${t(d.statut === 'termine' ? 'termine' : 'annule')}</div>
+              ${params.get('c') ? `<button class="btn btn-grand" onclick="nouveau()">${t('nouveau')}</button>` : ''}</div>`;
+    }
+    $('vue-suivi').innerHTML = bloc + `<p class="ch-note">${t('maj')} ${hhmm(new Date())}</p>`;
+    afficher('vue-suivi');
+  }
+
+  function demarrerSuivi(token) {
+    E.token = token;
+    clearInterval(E.minuteur);
+    actualiser();
+    E.minuteur = setInterval(actualiser, 20000);
+  }
+  function nouveau() {
+    try { localStorage.removeItem('flux-token'); } catch (e) {}
+    E.dernier = null; clearInterval(E.minuteur);
+    history.replaceState(null, '', location.pathname + '?c=' + params.get('c'));
+    afficher('vue-inscription');
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && E.token) actualiser(); });
+
+  // --- Démarrage -------------------------------------------------------
+  appliquerLangue();
+  (function () {
+    const token = params.get('t') || (params.get('c') ? null : memo.get('flux-token'));
+    const tokenMemo = memo.get('flux-token');
+    if (token) { memo.set('flux-token', token); demarrerSuivi(token); }
+    else if (params.get('c') && tokenMemo) demarrerSuivi(tokenMemo);   // re-scan : on reprend le suivi en cours
+    else if (params.get('c')) afficher('vue-inscription');
+    else afficher('vue-vide');
+  })();
+  </script>
+</body>
+</html>

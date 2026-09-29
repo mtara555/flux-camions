@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101828">
+  <title>Flux Camions — Affiche QR</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .outils { display: flex; gap: 10px; flex-wrap: wrap; }
+    .outils .btn { flex: 1; min-width: 180px; }
+    .affiche {
+      background: #fff; border: 1px solid var(--bord); border-radius: var(--rayon); padding: 32px 28px;
+      display: grid; gap: 18px; text-align: center; max-width: 720px; margin: 0 auto; width: 100%;
+    }
+    .affiche h2 { margin: 0; font-size: 34px; line-height: 1.15; }
+    .affiche .ar { font-size: 30px; direction: rtl; font-weight: 800; }
+    .affiche .qr { width: min(70vw, 380px); margin: 0 auto; padding: 12px; border: 6px solid #101828; border-radius: 18px; }
+    .affiche .qr svg { width: 100%; height: auto; display: block; }
+    .etapes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center; }
+    .etape { background: var(--neutre); border-radius: 12px; padding: 12px 8px; font-size: 15px; font-weight: 600; }
+    .etape b { display: block; font-size: 26px; }
+    .etape .ar { font-size: 15px; font-weight: 600; display: block; margin-top: 4px; }
+    .url { font-size: 12px; color: var(--texte-2); word-break: break-all; }
+    .code { font-family: ui-monospace, monospace; background: var(--neutre); padding: 2px 8px; border-radius: 6px; }
+    @media print {
+      .barre, .outils, #infos, #toasts { display: none !important; }
+      body { background: #fff; }
+      main { padding: 0; }
+      .affiche { border: 0; max-width: none; padding: 10mm; }
+      .affiche h2 { font-size: 40px; }
+      .affiche .qr { width: 120mm; }
+    }
+    @media (max-width: 560px) { .etapes { grid-template-columns: 1fr; } .affiche h2 { font-size: 26px; } }
+  </style>
+</head>
+<body>
+  <header class="barre">
+    <div><h1>Affiche QR du portail</h1><div class="sous" id="utilisateur">…</div></div>
+    <span class="espace"></span>
+    <span id="nav"></span>
+    <button class="btn-lien" id="btn-deconnexion">Quitter</button>
+  </header>
+
+  <main>
+    <div class="outils">
+      <button class="btn btn-principal" id="btn-imprimer">🖨️ Imprimer l'affiche</button>
+      <a class="btn" id="lien-test" target="_blank" rel="noopener" style="text-decoration:none">🔗 Tester le lien chauffeur</a>
+      <button class="btn btn-danger" id="btn-changer">🔄 Changer le code</button>
+    </div>
+    <p class="detail" id="infos" style="margin:0"></p>
+
+    <section class="affiche" id="affiche">
+      <h2>🚚 Chauffeurs : prenez votre numéro d'attente</h2>
+      <div class="ar">السائقون: خذوا رقم الانتظار</div>
+      <div class="qr" id="qr"></div>
+      <div class="etapes">
+        <div class="etape"><b>1</b>Scannez avec l'appareil photo<span class="ar">امسح الرمز بالكاميرا</span></div>
+        <div class="etape"><b>2</b>Saisissez votre plaque<span class="ar">أدخل رقم اللوحة</span></div>
+        <div class="etape"><b>3</b>Attendez votre tour ici<span class="ar">انتظر دورك هنا</span></div>
+      </div>
+      <p style="margin:0;font-weight:700">Réception 07h00 – 14h00 · Produits frais prioritaires</p>
+      <div class="url" id="url"></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
+  <script src="config.js"></script>
+  <script src="commun.js"></script>
+  <script>
+  const $ = (id) => document.getElementById(id);
+  let P = null;
+  const urlChauffeur = () => new URL('chauffeur.html', location.href).href.split('?')[0];
+
+  function dessiner() {
+    const lien = `${urlChauffeur()}?c=${encodeURIComponent(P.code_qr)}`;
+    const q = qrcode(0, 'M');
+    q.addData(lien);
+    q.make();
+    $('qr').innerHTML = q.createSvgTag(8, 0);
+    $('url').textContent = lien;
+    $('lien-test').href = lien;
+    const o = P.heure_ouverture.slice(0, 5).replace(':', 'h'), f = P.heure_fermeture.slice(0, 5).replace(':', 'h');
+    document.querySelector('.affiche p').textContent = `Réception ${o} – ${f} · Produits frais prioritaires`;
+    $('infos').innerHTML = `Code actuel : <span class="code">${App.echapper(P.code_qr)}</span> · Lien des SMS : ${App.echapper(P.url_chauffeur || '—')}`;
+  }
+
+  $('btn-imprimer').addEventListener('click', () => window.print());
+  $('btn-changer').addEventListener('click', async () => {
+    if (!confirm('Changer le code ? L\'ancienne affiche ne fonctionnera plus : il faudra imprimer la nouvelle.')) return;
+    const code = Array.from(crypto.getRandomValues(new Uint8Array(4)), b => b.toString(16).padStart(2, '0')).join('');
+    const { data, error } = await sb.from('parametres').update({ code_qr: code, updated_at: new Date().toISOString() }).eq('id', 1).select().single();
+    if (error) return App.erreur(error);
+    P = data; dessiner();
+    App.toast('Nouveau code enregistré — imprimez la nouvelle affiche');
+  });
+  $('btn-deconnexion').addEventListener('click', () => App.deconnexion());
+
+  (async () => {
+    const profil = await App.exigerConnexion([]);   // responsable uniquement
+    if (!profil) return;
+    $('utilisateur').textContent = profil.nom;
+    App.navigation('qr.html');
+    const { data, error } = await sb.from('parametres').select('*').single();
+    if (error) return App.erreur(error);
+    P = data;
+    // Le lien envoyé par SMS pointe automatiquement vers cette installation
+    if (P.url_chauffeur !== urlChauffeur()) {
+      const r = await sb.from('parametres').update({ url_chauffeur: urlChauffeur() }).eq('id', 1).select().single();
+      if (!r.error) P = r.data;
+    }
+    dessiner();
+  })();
+  </script>
+</body>
+</html>
