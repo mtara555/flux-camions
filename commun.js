@@ -13,9 +13,18 @@ const App = {
   PAGES: {
     responsable: 'securite.html',
     securite:    'securite.html',
-    chef_frais:  null,   // étape 3 : equipe.html
-    chef_pgc:    null,   // étape 3 : equipe.html
+    chef_frais:  'equipe.html',
+    chef_pgc:    'equipe.html',
     ecran:       null    // étape 4 : ecran.html
+  },
+
+  // Liens de navigation entre écrans (responsable uniquement)
+  navigation(courante) {
+    const zone = document.getElementById('nav');
+    if (!zone || !App.profil || App.profil.role !== 'responsable') return;
+    const pages = [['securite.html', 'Portail'], ['equipe.html', 'Équipes']];
+    zone.innerHTML = pages.filter(([p]) => p !== courante)
+      .map(([p, lib]) => `<a class="btn-lien" href="${p}">${lib}</a>`).join('');
   },
 
   ROLES: {
