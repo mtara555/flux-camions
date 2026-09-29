@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101828">
+  <title>Flux Camions — Équipe</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="equipe">
+  <header class="barre">
+    <div>
+      <h1 id="titre">Équipe</h1>
+      <div class="sous" id="utilisateur">…</div>
+    </div>
+    <span id="pastille-direct" title="Temps réel"></span>
+    <span class="espace"></span>
+    <span id="nav"></span>
+    <span id="horloge" class="horloge">--h--</span>
+    <button class="btn-lien" id="btn-deconnexion">Quitter</button>
+  </header>
+
+  <main>
+    <!-- Choix de la piste (responsable / agent uniquement) -->
+    <div class="choix-piste onglets" id="choix-piste" hidden style="padding:0">
+      <button class="onglet" data-piste="FRAIS">❄️ Piste Frais</button>
+      <button class="onglet" data-piste="PGC">📦 Piste PGC / NF</button>
+    </div>
+
+    <!-- Activation son + écran allumé (le navigateur exige un appui) -->
+    <div class="activer" id="activer">
+      <p>🔔 Appuyez pour recevoir les alertes sonores et garder l'écran allumé.</p>
+      <button class="btn btn-principal" id="btn-activer">Activer</button>
+    </div>
+
+    <!-- Alerte d'arrivée / de dépassement -->
+    <div id="bandeau" class="bandeau-alerte" hidden></div>
+
+    <!-- État du quai -->
+    <section class="carte quai" id="quai"></section>
+
+    <!-- Signalement -->
+    <section class="carte" id="bloc-signaler" hidden>
+      <div class="titre-section"><h2>Signaler au responsable</h2></div>
+      <div class="signaler">
+        <button class="btn btn-danger" data-signal="Réception longue — camion bloqué">⏱️ Réception longue</button>
+        <button class="btn" data-signal="Manque de personnel au quai">👥 Manque personnel</button>
+        <button class="btn" data-signal="Problème de marchandise / document">📄 Problème marchandise</button>
+        <button class="btn" data-signal="autre">✏️ Autre…</button>
+      </div>
+    </section>
+
+    <!-- Camions à venir sur ce quai -->
+    <section class="carte">
+      <div class="titre-section">
+        <h2>Camions à venir sur mon quai</h2>
+        <span class="compte" id="compte-avenir">0</span>
+      </div>
+      <ul class="liste" id="avenir"></ul>
+    </section>
+
+    <!-- Journée -->
+    <section class="carte">
+      <div class="titre-section"><h2>Aujourd'hui sur mon quai</h2></div>
+      <div class="stats">
+        <div class="stat"><b id="st-recus">0</b><span>camions reçus</span></div>
+        <div class="stat"><b id="st-moy">—</b><span>durée moyenne</span></div>
+        <div class="stat"><b id="st-dep">0</b><span>dépassements</span></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="commun.js"></script>
+  <script>
+  // =====================================================================
+  //  ÉCRAN CHEFS D'ÉQUIPE (smartphone)
+  // =====================================================================
+  const $ = (id) => document.getElementById(id);
+  const esc = App.echapper;
+  const LIB_TAILLE = { camionnette: 'Camionnette', porteur: 'Porteur', semi: 'Semi-remorque' };
+  const E = {
+    piste: null, quai: null, avenir: [], stats: [],
+    dernierAppel: null,      // camion déjà signalé comme « arrive »
+    depasseSignale: null,    // camion déjà signalé en dépassement
+    alertesActives: false, wakeLock: null, audio: null
+  };
+
+  // --- Alertes : son, vibration, écran allumé --------------------------
+  async function activerAlertes() {
+    try {
+      E.audio = E.audio || new (window.AudioContext || window.webkitAudioContext)();
+      await E.audio.resume();
+    } catch (e) { /* pas de son disponible */ }
+    await garderEcranAllume();
+    E.alertesActives = true;
+    $('activer').hidden = true;
+    bip(1);
+    App.toast('Alertes activées', 'ok');
+  }
+  async function garderEcranAllume() {
+    try {
+      if ('wakeLock' in navigator && !E.wakeLock) {
+        E.wakeLock = await navigator.wakeLock.request('screen');
+        E.wakeLock.addEventListener('release', () => { E.wakeLock = null; });
+      }
+    } catch (e) { /* non supporté */ }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && E.alertesActives) { garderEcranAllume(); charger(); }
+  });
+  function bip(n = 3) {
+    if (!E.audio) return;
+    for (let i = 0; i < n; i++) {
+      const o = E.audio.createOscillator(), g = E.audio.createGain();
+      o.type = 'square'; o.frequency.value = 880;
+      const t = E.audio.currentTime + i * 0.35;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.4, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+      o.connect(g).connect(E.audio.destination);
+      o.start(t); o.stop(t + 0.3);
+    }
+  }
+  function alerter(html, classe) {
+    const b = $('bandeau');
+    b.className = 'bandeau-alerte ' + classe;
+    b.innerHTML = html;
+    b.hidden = false;
+    bip(classe === 'bloque' ? 5 : 3);
+    if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 800]);
+  }
+  $('bandeau').addEventListener('click', () => { $('bandeau').hidden = true; });
+
+  // --- Chargement ------------------------------------------------------
+  async function charger() {
+    if (!E.piste) return;
+    try {
+      const [q, f, s] = await Promise.all([
+        sb.from('v_quais').select('*').eq('id', E.piste).single(),
+        sb.from('v_file').select('*').eq('piste_cible', E.piste).order('heure_estimee').order('heure_arrivee'),
+        sb.from('affectations').select('*').eq('quai_id', E.piste).gte('heure_appel', App.debutJour())
+      ]);
+      for (const r of [q, f, s]) if (r.error) throw r.error;
+      E.quai = q.data; E.avenir = f.data; E.stats = s.data;
+      detecter();
+      rendre();
+    } catch (e) { App.erreur(e); }
+  }
+
+  // Règle 8 : camion affecté au quai → alerte ; réception trop longue → alerte
+  function detecter() {
+    const q = E.quai;
+    const premierChargement = E.dernierAppel === null;
+    if (q.statut === 'appele') {
+      if (!premierChargement && E.dernierAppel !== q.camion_id) {
+        alerter(`<span class="petit">CAMION EN APPROCHE — préparez le quai</span>
+                 <span class="gros">${esc(q.numero)}</span>
+                 <span>${esc(q.plaque)} · ${esc(q.fournisseur || '')}</span>
+                 <span class="petit">${LIB_TAILLE[q.taille] || ''}${q.multi_lignes ? ' · Multi-lignes' : ''} · Touchez pour fermer</span>`,
+                q.type === 'frais' ? 'frais' : 'pgc');
+      }
+      E.dernierAppel = q.camion_id;
+    } else {
+      if (q.statut === 'libre') $('bandeau').hidden = true;
+      E.dernierAppel = q.statut === 'occupe' ? q.camion_id : '';
+    }
+    const depasse = q.statut === 'occupe' && App.minutesDepuis(q.heure_debut) > q.duree_prevue_min;
+    if (depasse && E.depasseSignale !== q.camion_id) {
+      E.depasseSignale = q.camion_id;
+      alerter(`<span class="petit">RÉCEPTION PLUS LONGUE QUE PRÉVU</span>
+               <span class="gros">${esc(q.numero)}</span>
+               <span>${App.duree(App.minutesDepuis(q.heure_debut))} / prévu ${App.duree(q.duree_prevue_min)}</span>
+               <span class="petit">Signalez le problème si nécessaire · Touchez pour fermer</span>`, 'bloque');
+    }
+  }
+
+  // --- Affichage -------------------------------------------------------
+  function rendre() {
+    rendreQuai();
+    rendreAvenir();
+    rendreStats();
+  }
+
+  function rendreQuai() {
+    const q = E.quai;
+    if (!q) return;
+    const cls = q.id === 'FRAIS' ? 'frais' : 'pgc';
+    const depasse = q.statut === 'occupe' && App.minutesDepuis(q.heure_debut) > q.duree_prevue_min;
+    const lib = depasse ? 'Dépassement' : { libre: 'Libre', appele: 'Camion en approche', occupe: 'En réception' }[q.statut];
+    let corps, actions = '';
+    if (q.statut === 'libre') {
+      const p = E.avenir[0];
+      corps = `<div class="quai-vide">Quai libre — en attente d'un camion</div>
+               ${p ? `<div class="suivant">Prochain prévu : <b>${esc(p.numero)}</b> · ${esc(p.plaque)} vers ${App.hhmm(p.heure_estimee)}</div>` : ''}`;
+    } else {
+      const ecoule = q.statut === 'occupe' ? App.minutesDepuis(q.heure_debut) : App.minutesDepuis(q.heure_appel);
+      const pct = q.statut === 'occupe' ? Math.min(100, Math.round(ecoule / q.duree_prevue_min * 100)) : 0;
+      corps = `
+        <div class="quai-camion">
+          <div class="numero ${q.type}">${esc(q.numero)}</div>
+          <div class="quai-infos">
+            <div class="plaque">${esc(q.plaque)}</div>
+            <div class="detail">${esc(q.fournisseur || 'Fournisseur non renseigné')}</div>
+            <div class="detail">${q.type === 'frais' ? 'Frais' : 'PGC/NF'} · ${LIB_TAILLE[q.taille] || ''}${q.multi_lignes ? ' · Multi-lignes' : ''}${q.mode === 'enlevement' ? ' · Retour fournisseur' : ''}</div>
+          </div>
+        </div>
+        <div class="detail">${q.statut === 'occupe'
+          ? `En réception depuis <b>${App.duree(ecoule)}</b> / prévu ${App.duree(q.duree_prevue_min)}`
+          : `Appelé à ${App.hhmm(q.heure_appel)} — arrive au quai`}</div>
+        ${q.statut === 'occupe' ? `<div class="jauge ${depasse ? 'depasse' : ''}"><span style="width:${pct}%"></span></div>` : ''}`;
+      actions = q.statut === 'appele'
+        ? `<button class="btn btn-grand btn-principal" data-action="debut">🚚 Camion à quai — début réception</button>`
+        : `<button class="btn btn-grand btn-ok" data-action="liberer">✅ Réception terminée — quai libéré</button>`;
+    }
+    $('quai').className = `carte quai ${cls} ${depasse ? 'depasse' : ''}`;
+    $('quai').innerHTML = `
+      <div class="quai-tete">
+        <h3>${q.id === 'FRAIS' ? '❄️' : '📦'} ${esc(q.libelle)}</h3>
+        <span class="statut ${depasse ? 'depasse' : q.statut}">${lib}</span>
+      </div>
+      ${corps}
+      <div class="quai-actions">${actions}</div>`;
+    $('bloc-signaler').hidden = q.statut === 'libre';
+  }
+
+  function rendreAvenir() {
+    $('compte-avenir').textContent = E.avenir.length;
+    $('avenir').innerHTML = E.avenir.length ? E.avenir.map(c => `
+      <li class="ligne">
+        <div class="numero ${c.type}">${esc(c.numero)}</div>
+        <div class="ligne-infos">
+          <div class="ligne-haut"><span class="plaque">${esc(c.plaque)}</span><span class="detail">${esc(c.fournisseur || '')}</span></div>
+          <div class="puces">
+            <span class="puce ${c.type}">${c.type === 'frais' ? 'Frais' : 'PGC/NF'}</span>
+            ${c.prioritaire ? '<span class="puce prio">Prioritaire</span>' : ''}
+            ${c.taille !== 'porteur' ? `<span class="puce">${LIB_TAILLE[c.taille]}</span>` : ''}
+            ${c.multi_lignes ? '<span class="puce">Multi-lignes</span>' : ''}
+            ${c.mode === 'enlevement' ? '<span class="puce">Retour</span>' : ''}
+          </div>
+        </div>
+        <div class="ligne-temps"><span class="detail">Vers</span><span class="estimee">${App.hhmm(c.heure_estimee)}</span></div>
+      </li>`).join('') : `<li class="vide">Aucun camion en attente pour ce quai</li>`;
+  }
+
+  function rendreStats() {
+    const finis = E.stats.filter(a => a.duree_reelle_min != null);
+    $('st-recus').textContent = finis.length;
+    $('st-moy').textContent = finis.length ? App.duree(Math.round(finis.reduce((s, a) => s + a.duree_reelle_min, 0) / finis.length)) : '—';
+    $('st-dep').textContent = finis.filter(a => a.duree_reelle_min > a.duree_prevue_min).length;
+  }
+
+  // --- Actions ---------------------------------------------------------
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-action],[data-signal]');
+    if (!b) return;
+    b.disabled = true;
+    try {
+      if (b.dataset.action === 'debut') {
+        await App.rpc('fn_debut_reception', { p_quai: E.piste });
+        $('bandeau').hidden = true;
+        App.toast('Réception démarrée');
+      } else if (b.dataset.action === 'liberer') {
+        if (!confirm('Réception terminée ? Le quai sera libéré et le portail appellera le camion suivant.')) return;
+        await App.rpc('fn_liberer_quai', { p_quai: E.piste });
+        $('bandeau').hidden = true;
+        App.toast('Quai libéré — le portail est prévenu');
+      } else if (b.dataset.signal) {
+        let msg = b.dataset.signal;
+        if (msg === 'autre') {
+          msg = prompt('Message pour le responsable :', '');
+          if (!msg) return;
+        }
+        await App.rpc('fn_signaler', { p_quai: E.piste, p_message: msg });
+        App.toast('Signalement envoyé');
+      }
+      charger();
+    } catch (err) { App.erreur(err); }
+    finally { b.disabled = false; }
+  });
+
+  function choisirPiste(p) {
+    E.piste = p;
+    E.dernierAppel = null; E.depasseSignale = null;
+    try { localStorage.setItem('flux-piste', p); } catch (e) {}
+    $('titre').textContent = p === 'FRAIS' ? 'Équipe Frais' : 'Équipe PGC / NF';
+    document.querySelectorAll('[data-piste]').forEach(x => x.classList.toggle('actif', x.dataset.piste === p));
+    $('bandeau').hidden = true;
+    charger();
+  }
+  $('choix-piste').addEventListener('click', (e) => { const o = e.target.closest('[data-piste]'); if (o) choisirPiste(o.dataset.piste); });
+  $('btn-activer').addEventListener('click', activerAlertes);
+  $('btn-deconnexion').addEventListener('click', () => App.deconnexion());
+
+  // --- Démarrage -------------------------------------------------------
+  (async () => {
+    const profil = await App.exigerConnexion(['chef_frais', 'chef_pgc', 'securite']);
+    if (!profil) return;
+    $('utilisateur').textContent = profil.nom;
+    App.navigation('equipe.html');
+    let piste;
+    if (profil.role === 'chef_frais') piste = 'FRAIS';
+    else if (profil.role === 'chef_pgc') piste = 'PGC';
+    else {
+      $('choix-piste').hidden = false;
+      try { piste = localStorage.getItem('flux-piste'); } catch (e) {}
+      piste = piste === 'PGC' ? 'PGC' : 'FRAIS';
+    }
+    const tic = () => { $('horloge').textContent = App.hhmm(new Date()); };
+    tic(); setInterval(tic, 10000);
+    choisirPiste(piste);
+    App.ecouter(['quais', 'camions'], charger);
+    setInterval(() => { if (E.quai) { detecter(); rendreQuai(); } }, 30000);  // chronomètre + dépassement
+    setInterval(charger, 30000);                                              // filet de sécurité
+  })();
+  </script>
+</body>
+</html>
