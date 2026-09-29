@@ -218,6 +218,36 @@ main { padding: 16px; max-width: 1280px; margin: 0 auto; display: grid; gap: 16p
 .toast-info { background: #101828; }
 .toast.sortie { opacity: 0; transform: translateY(8px); }
 
+
+/* --- Navigation responsable ------------------------------------------ */
+#nav { display: flex; gap: 6px; }
+#nav a { text-decoration: none; }
+
+/* --- Écran équipes --------------------------------------------------- */
+.equipe main { max-width: 640px; }
+.activer {
+  display: flex; gap: 12px; align-items: center; padding: 14px 16px;
+  background: var(--attention-clair); border: 1px solid #f5d98b; border-radius: var(--rayon);
+}
+.activer p { margin: 0; flex: 1; font-size: 14px; }
+.bandeau-alerte {
+  border-radius: var(--rayon); padding: 18px; color: #fff; display: grid; gap: 6px; text-align: center;
+  animation: pulse 1.2s ease-in-out infinite; cursor: pointer;
+}
+.bandeau-alerte.frais { background: var(--frais); }
+.bandeau-alerte.pgc { background: var(--pgc); }
+.bandeau-alerte.bloque { background: var(--alerte); }
+.bandeau-alerte .gros { font-size: 30px; font-weight: 800; }
+.bandeau-alerte .petit { font-size: 14px; opacity: .9; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.015); box-shadow: 0 0 0 8px rgba(0,0,0,.06); } }
+.signaler { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 16px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+.stat { padding: 12px 16px; border-top: 1px solid var(--bord); }
+.stat + .stat { border-left: 1px solid var(--bord); }
+.stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--texte-2); }
+.choix-piste { display: flex; gap: 6px; }
+
 /* --- Petits écrans ----------------------------------------------------- */
 .etat-ouverture, .horloge, .btn-lien { white-space: nowrap; }
 @media (max-width: 760px) {
