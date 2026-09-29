@@ -15,6 +15,7 @@
     </div>
     <span id="pastille-direct" title="Temps réel"></span>
     <span class="espace"></span>
+    <span id="nav"></span>
     <span id="etat-ouverture" class="etat-ouverture">—</span>
     <span id="horloge" class="horloge">--h--</span>
     <button class="btn-lien" id="btn-deconnexion">Quitter</button>
@@ -429,6 +430,7 @@
     const profil = await App.exigerConnexion(['securite']);
     if (!profil) return;
     $('utilisateur').textContent = profil.nom === App.ROLES[profil.role] || profil.role === 'securite' ? profil.nom : `${profil.nom} · ${App.ROLES[profil.role]}`;
+    App.navigation('securite.html');
     const { data } = await sb.from('parametres').select('*').single();
     E.params = data;
     tic();
