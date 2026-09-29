@@ -1,0 +1,237 @@
+/* =====================================================================
+   FLUX CAMIONS — Styles communs (tablette / smartphone)
+   ===================================================================== */
+:root {
+  --fond: #f2f4f7;
+  --carte: #ffffff;
+  --texte: #14181f;
+  --texte-2: #5b6472;
+  --bord: #dde2e9;
+  --frais: #0b6bcb;
+  --frais-clair: #e3f0fc;
+  --pgc: #c25e00;
+  --pgc-clair: #fdefe1;
+  --ok: #1a7f37;
+  --ok-clair: #e2f5e7;
+  --alerte: #c9302c;
+  --alerte-clair: #fde8e7;
+  --attention: #9a6700;
+  --attention-clair: #fff4d6;
+  --neutre: #eef1f5;
+  --ombre: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+  --rayon: 14px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--fond);
+  color: var(--texte);
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+[hidden] { display: none !important; }
+
+/* --- Barre du haut -------------------------------------------------- */
+.barre {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  background: #101828; color: #fff;
+}
+.barre h1 { font-size: 18px; margin: 0; font-weight: 700; }
+.barre .sous { font-size: 13px; opacity: .7; }
+.barre .espace { flex: 1; }
+.horloge { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; }
+.etat-ouverture {
+  font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+  background: rgba(255,255,255,.12);
+}
+.etat-ouverture.ouvert { background: #1a7f37; }
+.etat-ouverture.ferme { background: #c9302c; }
+#pastille-direct {
+  width: 10px; height: 10px; border-radius: 50%; background: #98a2b3;
+  display: inline-block;
+}
+#pastille-direct.actif { background: #32d583; box-shadow: 0 0 0 3px rgba(50,213,131,.25); }
+.btn-lien {
+  background: none; border: 1px solid rgba(255,255,255,.3); color: #fff;
+  border-radius: 10px; padding: 6px 12px; font-size: 14px;
+}
+
+/* --- Mise en page ---------------------------------------------------- */
+main { padding: 16px; max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+.carte {
+  background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+}
+.titre-section {
+  display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+.titre-section h2 { font-size: 17px; margin: 0; }
+.compte {
+  background: var(--neutre); border-radius: 999px; padding: 2px 10px; font-size: 14px; font-weight: 600;
+}
+
+/* --- Boutons --------------------------------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 10px 18px; border-radius: 12px; border: 1px solid var(--bord);
+  background: #fff; font-weight: 600; font-size: 16px;
+}
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-principal { background: #101828; color: #fff; border-color: #101828; }
+.btn-ok { background: var(--ok); color: #fff; border-color: var(--ok); }
+.btn-frais { background: var(--frais); color: #fff; border-color: var(--frais); }
+.btn-pgc { background: var(--pgc); color: #fff; border-color: var(--pgc); }
+.btn-danger { color: var(--alerte); border-color: #f1b5b2; }
+.btn-grand { min-height: 60px; font-size: 18px; width: 100%; }
+.btn-petit { min-height: 38px; padding: 6px 12px; font-size: 14px; border-radius: 10px; }
+
+/* --- Quais ----------------------------------------------------------- */
+.quais { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.quai { padding: 16px; display: grid; gap: 12px; border-top: 6px solid var(--bord); }
+.quai.frais { border-top-color: var(--frais); }
+.quai.pgc { border-top-color: var(--pgc); }
+.quai.depasse { border-color: var(--alerte); box-shadow: 0 0 0 3px var(--alerte-clair); }
+.quai-tete { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.quai-tete h3 { margin: 0; font-size: 20px; }
+.statut { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: .02em; }
+.statut.libre { background: var(--ok-clair); color: var(--ok); }
+.statut.appele { background: var(--attention-clair); color: var(--attention); }
+.statut.occupe { background: var(--neutre); color: var(--texte); }
+.statut.depasse { background: var(--alerte); color: #fff; }
+.quai-camion { display: flex; gap: 14px; align-items: center; }
+.numero {
+  font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+  min-width: 96px; text-align: center; padding: 6px 10px; border-radius: 12px; background: var(--neutre);
+}
+.frais .numero, .numero.frais { background: var(--frais-clair); color: var(--frais); }
+.pgc .numero, .numero.pgc { background: var(--pgc-clair); color: var(--pgc); }
+.quai-infos { display: grid; gap: 2px; min-width: 0; }
+.plaque { font-weight: 700; font-size: 18px; letter-spacing: .03em; }
+.detail { color: var(--texte-2); font-size: 14px; }
+.quai-vide { color: var(--texte-2); padding: 18px 0; text-align: center; }
+.suivant { background: var(--neutre); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.suivant b { font-size: 16px; }
+.jauge { height: 8px; background: var(--neutre); border-radius: 99px; overflow: hidden; }
+.jauge > span { display: block; height: 100%; background: var(--ok); border-radius: 99px; transition: width .4s; }
+.jauge.depasse > span { background: var(--alerte); }
+.quai-actions { display: grid; gap: 8px; }
+
+/* --- File d'attente -------------------------------------------------- */
+.onglets { display: flex; gap: 6px; padding: 0 16px 10px; flex-wrap: wrap; }
+.onglet {
+  border: 1px solid var(--bord); background: #fff; border-radius: 999px; padding: 8px 16px;
+  font-weight: 600; font-size: 15px; min-height: 42px;
+}
+.onglet.actif { background: #101828; color: #fff; border-color: #101828; }
+.liste { list-style: none; margin: 0; padding: 0; }
+.ligne {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center;
+  padding: 12px 16px; border-top: 1px solid var(--bord);
+}
+.ligne .numero { font-size: 22px; min-width: 76px; padding: 4px 8px; }
+.ligne-infos { min-width: 0; display: grid; gap: 4px; }
+.ligne-haut { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ligne-temps { text-align: right; display: grid; gap: 2px; }
+.estimee { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.puces { display: flex; gap: 6px; flex-wrap: wrap; }
+.puce {
+  font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--neutre); color: var(--texte-2);
+  text-transform: uppercase; letter-spacing: .02em;
+}
+.puce.frais { background: var(--frais-clair); color: var(--frais); }
+.puce.pgc { background: var(--pgc-clair); color: var(--pgc); }
+.puce.prio { background: var(--alerte-clair); color: var(--alerte); }
+.puce.redir { background: var(--frais); color: #fff; }
+.ligne-actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+.vide { padding: 28px 16px; text-align: center; color: var(--texte-2); border-top: 1px solid var(--bord); }
+
+/* --- Alertes ----------------------------------------------------------- */
+.alerte-item {
+  display: flex; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--bord); align-items: baseline;
+}
+.alerte-item .h { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--alerte); }
+
+/* --- Fenêtres (modales) -------------------------------------------- */
+.modale-fond {
+  position: fixed; inset: 0; background: rgba(16, 24, 40, .55); z-index: 50;
+  display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto;
+}
+.modale {
+  background: #fff; border-radius: 18px; width: 100%; max-width: 620px; padding: 20px;
+  display: grid; gap: 16px; box-shadow: 0 20px 50px rgba(0,0,0,.25);
+}
+.modale h2 { margin: 0; font-size: 20px; }
+.champ { display: grid; gap: 6px; }
+.champ > label, .champ > .etiquette { font-weight: 600; font-size: 14px; color: var(--texte-2); }
+.champ input[type=text], .champ input[type=tel], .champ input[type=email], .champ input[type=password], .champ textarea {
+  width: 100%; min-height: 52px; padding: 12px 14px; border: 1px solid var(--bord); border-radius: 12px;
+  background: #fff; font-size: 18px;
+}
+.champ textarea { min-height: 70px; font-size: 16px; }
+.champ input:focus, .champ textarea:focus { outline: 3px solid #b2ccff; border-color: #528bff; }
+#f-plaque { text-transform: uppercase; font-weight: 700; letter-spacing: .05em; font-size: 22px; }
+.choix { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
+.choix input { position: absolute; opacity: 0; pointer-events: none; }
+.choix label {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  min-height: 56px; border: 2px solid var(--bord); border-radius: 12px; font-weight: 700; padding: 6px;
+  background: #fff; cursor: pointer;
+}
+.choix input:checked + label { border-color: #101828; background: #101828; color: #fff; }
+.choix.type input[value=frais]:checked + label { background: var(--frais); border-color: var(--frais); }
+.choix.type input[value=pgc]:checked + label { background: var(--pgc); border-color: var(--pgc); }
+.cases { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.case {
+  display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px;
+  border: 1px solid var(--bord); border-radius: 12px; font-weight: 600; font-size: 15px;
+}
+.case input { width: 22px; height: 22px; accent-color: #101828; }
+.deux { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modale-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.modale-actions .btn { flex: 1; }
+.resultat { text-align: center; display: grid; gap: 10px; padding: 8px 0; }
+.resultat .numero { font-size: 64px; margin: 0 auto; padding: 10px 24px; }
+.resultat .estimee { font-size: 30px; }
+
+/* --- Connexion ------------------------------------------------------- */
+.connexion { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.connexion form { width: 100%; max-width: 400px; padding: 28px 24px; display: grid; gap: 16px; }
+.logo { font-size: 26px; font-weight: 800; margin: 0; }
+.logo small { display: block; font-size: 14px; font-weight: 500; color: var(--texte-2); }
+.message { padding: 10px 12px; border-radius: 10px; font-size: 14px; }
+.message.err { background: var(--alerte-clair); color: var(--alerte); }
+.message.info { background: var(--attention-clair); color: var(--attention); }
+
+/* --- Toasts ------------------------------------------------------------ */
+#toasts { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 100; display: grid; gap: 8px; width: min(92vw, 480px); }
+.toast { padding: 14px 16px; border-radius: 12px; color: #fff; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.2); transition: opacity .4s, transform .4s; }
+.toast-ok { background: #1a7f37; }
+.toast-err { background: #c9302c; }
+.toast-info { background: #101828; }
+.toast.sortie { opacity: 0; transform: translateY(8px); }
+
+/* --- Petits écrans ----------------------------------------------------- */
+.etat-ouverture, .horloge, .btn-lien { white-space: nowrap; }
+@media (max-width: 760px) {
+  .barre { gap: 8px; padding: 8px 12px; }
+  .barre h1 { font-size: 16px; }
+  .horloge { font-size: 18px; }
+  .etat-ouverture .plage { display: none; }
+  .btn-lien { padding: 6px 8px; font-size: 13px; }
+  .ligne { grid-template-columns: auto 1fr; }
+  .ligne-temps { grid-column: 1 / -1; display: flex; gap: 8px; align-items: baseline; justify-content: flex-start; text-align: left; }
+  .ligne-temps .estimee { font-size: 18px; }
+  .quais { grid-template-columns: 1fr; }
+  .cases { grid-template-columns: 1fr; }
+  .deux { grid-template-columns: 1fr; }
+  .barre .sous, .barre .masquer-mobile { display: none; }
+  .numero { font-size: 24px; min-width: 80px; }
+}

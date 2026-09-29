@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101828">
+  <title>Flux Camions — Portail</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="barre">
+    <div>
+      <h1>Portail · Réception</h1>
+      <div class="sous" id="utilisateur">…</div>
+    </div>
+    <span id="pastille-direct" title="Temps réel"></span>
+    <span class="espace"></span>
+    <span id="etat-ouverture" class="etat-ouverture">—</span>
+    <span id="horloge" class="horloge">--h--</span>
+    <button class="btn-lien" id="btn-deconnexion">Quitter</button>
+  </header>
+
+  <main>
+    <button id="btn-enregistrer" class="btn btn-principal btn-grand">＋ Enregistrer un camion</button>
+
+    <!-- Quais -->
+    <section class="quais" id="quais"></section>
+
+    <!-- Alertes des équipes -->
+    <section class="carte" id="bloc-alertes" hidden>
+      <div class="titre-section"><h2>⚠️ Alertes des équipes</h2></div>
+      <div id="alertes"></div>
+    </section>
+
+    <!-- File d'attente -->
+    <section class="carte">
+      <div class="titre-section">
+        <h2>File d'attente</h2>
+        <span class="compte" id="compte-file">0</span>
+      </div>
+      <div class="onglets" id="onglets">
+        <button class="onglet actif" data-filtre="tous">Tous</button>
+        <button class="onglet" data-filtre="frais">Frais</button>
+        <button class="onglet" data-filtre="pgc">PGC / NF</button>
+      </div>
+      <ul class="liste" id="file"></ul>
+    </section>
+
+    <!-- Reportés -->
+    <section class="carte">
+      <div class="titre-section">
+        <h2>Reportés (prochaine ouverture)</h2>
+        <span class="compte" id="compte-reportes">0</span>
+      </div>
+      <ul class="liste" id="reportes"></ul>
+    </section>
+  </main>
+
+  <!-- Formulaire camion -->
+  <div class="modale-fond" id="modale-camion" hidden>
+    <form class="modale" id="form-camion" autocomplete="off">
+      <h2 id="titre-form">Enregistrer un camion</h2>
+      <input type="hidden" id="f-id">
+
+      <div class="champ">
+        <label for="f-plaque">Plaque d'immatriculation *</label>
+        <input id="f-plaque" type="text" required placeholder="12345-A-6" inputmode="text">
+      </div>
+
+      <div class="champ">
+        <span class="etiquette">Type de marchandise *</span>
+        <div class="choix type">
+          <input type="radio" name="type" id="t-frais" value="frais"><label for="t-frais">❄️ FRAIS</label>
+          <input type="radio" name="type" id="t-pgc" value="pgc"><label for="t-pgc">📦 PGC / NF</label>
+        </div>
+      </div>
+
+      <div class="champ">
+        <span class="etiquette">Taille du véhicule</span>
+        <div class="choix">
+          <input type="radio" name="taille" id="s-cam" value="camionnette"><label for="s-cam">Camionnette</label>
+          <input type="radio" name="taille" id="s-por" value="porteur" checked><label for="s-por">Porteur</label>
+          <input type="radio" name="taille" id="s-semi" value="semi"><label for="s-semi">Semi-remorque</label>
+        </div>
+      </div>
+
+      <div class="deux">
+        <div class="champ">
+          <label for="f-fournisseur">Fournisseur</label>
+          <input id="f-fournisseur" type="text" placeholder="Ex : Centrale Danone">
+        </div>
+        <div class="champ">
+          <label for="f-tel">Téléphone chauffeur</label>
+          <input id="f-tel" type="tel" inputmode="tel" placeholder="06 00 00 00 00">
+        </div>
+      </div>
+
+      <div class="cases">
+        <label class="case"><input type="checkbox" id="f-multi"> Multi-lignes</label>
+        <label class="case"><input type="checkbox" id="f-enlevement"> Retour fournisseur</label>
+        <label class="case"><input type="checkbox" id="f-annonce"> Annoncé</label>
+      </div>
+
+      <div class="champ">
+        <label for="f-commentaire">Commentaire</label>
+        <textarea id="f-commentaire" rows="2"></textarea>
+      </div>
+
+      <div class="modale-actions">
+        <button type="button" class="btn" data-fermer>Annuler</button>
+        <button type="submit" class="btn btn-principal" id="btn-valider">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Résultat d'enregistrement -->
+  <div class="modale-fond" id="modale-resultat" hidden>
+    <div class="modale">
+      <div class="resultat" id="resultat"></div>
+      <button class="btn btn-principal btn-grand" data-fermer>OK</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="commun.js"></script>
+  <script>
+  // =====================================================================
+  //  TABLETTE SÉCURITÉ
+  // =====================================================================
+  const E = { quais: [], file: [], reportes: [], alertes: [], params: null, filtre: 'tous', ouverte: null };
+  const $ = (id) => document.getElementById(id);
+  const esc = App.echapper;
+  const LIB_TAILLE = { camionnette: 'Camionnette', porteur: 'Porteur', semi: 'Semi-remorque' };
+
+  // --- Chargement ------------------------------------------------------
+  async function charger() {
+    try {
+      const [q, f, r, a] = await Promise.all([
+        sb.from('v_quais').select('*').order('id'),
+        sb.from('v_file').select('*').order('heure_estimee').order('heure_arrivee'),
+        sb.from('camions').select('*').eq('statut', 'reporte').order('jour').order('numero'),
+        sb.from('notifications').select('*').eq('canal', 'interne').eq('type', 'alerte')
+          .gte('created_at', App.debutJour()).order('created_at', { ascending: false }).limit(10)
+      ]);
+      for (const res of [q, f, r, a]) if (res.error) throw res.error;
+      E.quais = q.data; E.file = f.data; E.reportes = r.data; E.alertes = a.data;
+      rendre();
+    } catch (e) { App.erreur(e); }
+  }
+
+  // Prochain camion qu'appellerait le bouton (même règle que la base : règles 2, 3, 5)
+  function prochain(quai) {
+    const ordre = (a, b) => (b.prioritaire - a.prioritaire) || (new Date(a.heure_arrivee) - new Date(b.heure_arrivee)) || a.numero.localeCompare(b.numero);
+    const tri = (liste) => liste.slice().sort(ordre)[0];
+    if (quai === 'FRAIS') {
+      return tri(E.file.filter(c => c.type === 'frais')) || tri(E.file.filter(c => c.type === 'pgc' && c.taille === 'camionnette'));
+    }
+    return tri(E.file.filter(c => c.type === 'pgc'));
+  }
+
+  // --- Affichage -------------------------------------------------------
+  function rendre() {
+    rendreQuais();
+    rendreFile();
+    rendreReportes();
+    rendreAlertes();
+  }
+
+  function rendreQuais() {
+    $('quais').innerHTML = E.quais.map(q => {
+      const cls = q.id === 'FRAIS' ? 'frais' : 'pgc';
+      const depasse = q.statut === 'occupe' && q.heure_debut && App.minutesDepuis(q.heure_debut) > q.duree_prevue_min;
+      const libStatut = depasse ? 'Dépassement' : { libre: 'Libre', appele: 'Camion appelé', occupe: 'En réception' }[q.statut];
+      let corps = '', actions = '';
+
+      if (q.statut === 'libre') {
+        const p = prochain(q.id);
+        corps = `<div class="quai-vide">Quai disponible</div>` + (p
+          ? `<div class="suivant">Prochain : <b>${esc(p.numero)}</b> · ${esc(p.plaque)} · ${esc(p.fournisseur || '')} ${p.type === 'pgc' && q.id === 'FRAIS' ? '<span class="puce redir">Camionnette redirigée</span>' : ''}</div>`
+          : `<div class="suivant">Aucun camion en attente pour ce quai</div>`);
+        actions = `<button class="btn btn-grand ${cls === 'frais' ? 'btn-frais' : 'btn-pgc'}" data-action="appeler" data-quai="${q.id}" ${p ? '' : 'disabled'}>📣 Appeler le suivant</button>`;
+      } else {
+        const ecoule = q.statut === 'occupe' ? App.minutesDepuis(q.heure_debut) : App.minutesDepuis(q.heure_appel);
+        const pct = q.statut === 'occupe' ? Math.min(100, Math.round(ecoule / q.duree_prevue_min * 100)) : 0;
+        corps = `
+          <div class="quai-camion">
+            <div class="numero ${q.type}">${esc(q.numero)}</div>
+            <div class="quai-infos">
+              <div class="plaque">${esc(q.plaque)}</div>
+              <div class="detail">${esc(q.fournisseur || 'Fournisseur non renseigné')}</div>
+              <div class="detail">${LIB_TAILLE[q.taille] || ''}${q.multi_lignes ? ' · Multi-lignes' : ''}${q.mode === 'enlevement' ? ' · Retour fournisseur' : ''}</div>
+            </div>
+          </div>
+          <div class="detail">${q.statut === 'occupe'
+            ? `En réception depuis <b>${App.duree(ecoule)}</b> / prévu ${App.duree(q.duree_prevue_min)}`
+            : `Appelé à ${App.hhmm(q.heure_appel)} (il y a ${App.duree(ecoule)}) — en approche`}</div>
+          ${q.statut === 'occupe' ? `<div class="jauge ${depasse ? 'depasse' : ''}"><span style="width:${pct}%"></span></div>` : ''}`;
+        actions = q.statut === 'appele'
+          ? `<button class="btn btn-grand btn-principal" data-action="debut" data-quai="${q.id}">🚚 Camion à quai — début réception</button>
+             <button class="btn btn-danger btn-petit" data-action="annuler" data-id="${q.camion_id}" data-numero="${esc(q.numero)}">Camion absent / annuler</button>`
+          : `<button class="btn btn-grand btn-ok" data-action="liberer" data-quai="${q.id}">✅ Réception terminée — libérer le quai</button>`;
+      }
+
+      return `
+        <article class="carte quai ${cls} ${depasse ? 'depasse' : ''}">
+          <div class="quai-tete">
+            <h3>${q.id === 'FRAIS' ? '❄️' : '📦'} ${esc(q.libelle)}</h3>
+            <span class="statut ${depasse ? 'depasse' : q.statut}">${libStatut}</span>
+          </div>
+          ${corps}
+          <div class="quai-actions">${actions}</div>
+        </article>`;
+    }).join('');
+  }
+
+  function puces(c) {
+    return [
+      `<span class="puce ${c.type}">${c.type === 'frais' ? 'Frais' : 'PGC/NF'}</span>`,
+      c.prioritaire ? '<span class="puce prio">Prioritaire</span>' : '',
+      c.type === 'pgc' && c.piste_cible === 'FRAIS' ? '<span class="puce redir">→ Quai frais</span>' : '',
+      c.taille !== 'porteur' ? `<span class="puce">${LIB_TAILLE[c.taille]}</span>` : '',
+      c.multi_lignes ? '<span class="puce">Multi-lignes</span>' : '',
+      c.mode === 'enlevement' ? '<span class="puce">Retour</span>' : '',
+      c.annonce ? '<span class="puce">Annoncé</span>' : '<span class="puce">Sans préavis</span>',
+      c.source !== 'agent' ? `<span class="puce">${c.source === 'qr' ? 'QR' : 'Géofence'}</span>` : ''
+    ].join('');
+  }
+
+  function rendreFile() {
+    const liste = E.file.filter(c => E.filtre === 'tous' || c.type === E.filtre);
+    $('compte-file').textContent = E.file.length;
+    if (!liste.length) { $('file').innerHTML = `<li class="vide">Aucun camion en attente</li>`; return; }
+    const libre = Object.fromEntries(E.quais.map(q => [q.id, q.statut === 'libre']));
+    $('file').innerHTML = liste.map(c => {
+      const ouvert = E.ouverte === c.id;
+      const peutForcer = (quai) => libre[quai] && !(c.taille === 'semi' && quai !== (c.type === 'frais' ? 'FRAIS' : 'PGC'));
+      return `
+        <li class="ligne" data-ligne="${c.id}">
+          <div class="numero ${c.type}">${esc(c.numero)}</div>
+          <div class="ligne-infos">
+            <div class="ligne-haut"><span class="plaque">${esc(c.plaque)}</span><span class="detail">${esc(c.fournisseur || '')}</span></div>
+            <div class="puces">${puces(c)}</div>
+            <div class="detail">Arrivé ${App.hhmm(c.heure_arrivee)} · attend depuis ${App.duree(App.minutesDepuis(c.heure_arrivee))}${c.telephone ? ' · 📱' : ''}${c.commentaire ? ' · ' + esc(c.commentaire) : ''}</div>
+          </div>
+          <div class="ligne-temps">
+            <span class="detail">Entrée estimée</span>
+            <span class="estimee">${App.hhmm(c.heure_estimee)}</span>
+            <span class="detail">${c.piste_cible === 'FRAIS' ? 'Quai frais' : 'Quai PGC'} · n°${c.position}</span>
+          </div>
+          ${ouvert ? `
+          <div class="ligne-actions">
+            <button class="btn btn-petit btn-frais" data-action="forcer" data-id="${c.id}" data-quai="FRAIS" ${peutForcer('FRAIS') ? '' : 'disabled'}>Faire entrer → Quai frais</button>
+            <button class="btn btn-petit btn-pgc" data-action="forcer" data-id="${c.id}" data-quai="PGC" ${peutForcer('PGC') ? '' : 'disabled'}>Faire entrer → Quai PGC</button>
+            <button class="btn btn-petit" data-action="modifier" data-id="${c.id}">Modifier</button>
+            <button class="btn btn-petit btn-danger" data-action="annuler" data-id="${c.id}" data-numero="${esc(c.numero)}">Annuler</button>
+          </div>` : ''}
+        </li>`;
+    }).join('');
+  }
+
+  function rendreReportes() {
+    $('compte-reportes').textContent = E.reportes.length;
+    $('reportes').innerHTML = E.reportes.length ? E.reportes.map(c => `
+      <li class="ligne" data-ligne="${c.id}">
+        <div class="numero ${c.type}">${esc(c.numero)}</div>
+        <div class="ligne-infos">
+          <div class="ligne-haut"><span class="plaque">${esc(c.plaque)}</span><span class="detail">${esc(c.fournisseur || '')}</span></div>
+          <div class="puces">${puces(c)}</div>
+        </div>
+        <div class="ligne-temps"><span class="detail">Prévu le</span><span class="estimee">${App.jourCourt(c.jour)}</span></div>
+        ${E.ouverte === c.id ? `
+        <div class="ligne-actions">
+          <button class="btn btn-petit" data-action="modifier" data-id="${c.id}">Modifier</button>
+          <button class="btn btn-petit btn-danger" data-action="annuler" data-id="${c.id}" data-numero="${esc(c.numero)}">Annuler</button>
+        </div>` : ''}
+      </li>`).join('') : `<li class="vide">Aucun camion reporté</li>`;
+  }
+
+  function rendreAlertes() {
+    $('bloc-alertes').hidden = !E.alertes.length;
+    $('alertes').innerHTML = E.alertes.map(a => `<div class="alerte-item"><span class="h">${App.hhmm(a.created_at)}</span><span>${esc(a.message)}</span></div>`).join('');
+  }
+
+  // --- Horloge et état d'ouverture ------------------------------------
+  function heureLocale() {
+    return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Africa/Casablanca', hour12: false });
+  }
+  function tic() {
+    const h = heureLocale();
+    $('horloge').textContent = h.slice(0, 5).replace(':', 'h');
+    if (E.params) {
+      const ouvert = h >= E.params.heure_ouverture && h < E.params.heure_fermeture;
+      const el = $('etat-ouverture');
+      el.className = 'etat-ouverture ' + (ouvert ? 'ouvert' : 'ferme');
+      el.innerHTML = (ouvert ? 'Ouvert' : 'Fermé') + `<span class="plage"> ${E.params.heure_ouverture.slice(0, 5).replace(':', 'h')}–${E.params.heure_fermeture.slice(0, 5).replace(':', 'h')}</span>`;
+    }
+  }
+
+  // --- Formulaire ------------------------------------------------------
+  function ouvrirForm(camion) {
+    const f = $('form-camion');
+    f.reset();
+    $('f-id').value = camion ? camion.id : '';
+    $('titre-form').textContent = camion ? `Modifier ${camion.numero}` : 'Enregistrer un camion';
+    $('btn-valider').textContent = camion ? 'Enregistrer les modifications' : 'Enregistrer';
+    if (camion) {
+      $('f-plaque').value = camion.plaque;
+      f.querySelector(`input[name=type][value=${camion.type}]`).checked = true;
+      f.querySelector(`input[name=taille][value=${camion.taille}]`).checked = true;
+      $('f-fournisseur').value = camion.fournisseur || '';
+      $('f-tel').value = camion.telephone || '';
+      $('f-multi').checked = camion.multi_lignes;
+      $('f-enlevement').checked = camion.mode === 'enlevement';
+      $('f-annonce').checked = camion.annonce;
+      $('f-commentaire').value = camion.commentaire || '';
+    }
+    $('modale-camion').hidden = false;
+    setTimeout(() => $('f-plaque').focus(), 50);
+  }
+
+  $('form-camion').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const type = f.querySelector('input[name=type]:checked')?.value;
+    if (!type) { App.toast('Choisissez FRAIS ou PGC/NF', 'err'); return; }
+    const d = {
+      plaque: $('f-plaque').value.trim(),
+      type,
+      taille: f.querySelector('input[name=taille]:checked').value,
+      fournisseur: $('f-fournisseur').value.trim() || null,
+      telephone: $('f-tel').value.trim() || null,
+      multi: $('f-multi').checked,
+      mode: $('f-enlevement').checked ? 'enlevement' : 'livraison',
+      annonce: $('f-annonce').checked,
+      commentaire: $('f-commentaire').value.trim() || null
+    };
+    const btn = $('btn-valider');
+    btn.disabled = true;
+    try {
+      const id = $('f-id').value;
+      if (id) {
+        await App.rpc('fn_modifier_camion', {
+          p_camion: id, p_plaque: d.plaque, p_type: d.type, p_taille: d.taille, p_fournisseur: d.fournisseur,
+          p_telephone: d.telephone, p_multi: d.multi, p_mode: d.mode, p_annonce: d.annonce, p_commentaire: d.commentaire
+        });
+        $('modale-camion').hidden = true;
+        App.toast('Camion modifié');
+      } else {
+        const r = await App.rpc('fn_enregistrer_camion', {
+          p_plaque: d.plaque, p_type: d.type, p_taille: d.taille, p_fournisseur: d.fournisseur,
+          p_telephone: d.telephone, p_multi: d.multi, p_mode: d.mode, p_annonce: d.annonce,
+          p_source: 'agent', p_commentaire: d.commentaire
+        });
+        $('modale-camion').hidden = true;
+        afficherResultat(r, d.type);
+      }
+      E.ouverte = null;
+      charger();
+    } catch (err) { App.erreur(err); }
+    finally { btn.disabled = false; }
+  });
+
+  function afficherResultat(r, type) {
+    let texte;
+    if (r.deja_enregistre) texte = `<p class="detail">Ce camion est déjà enregistré.</p>`;
+    else if (r.statut === 'reporte') texte = `<p>Réception fermée — passage le <b>${App.jourCourt(r.jour)}</b> dès l'ouverture, en priorité.</p>`;
+    else texte = `<p class="detail">Entrée estimée</p><p class="estimee">${App.hhmm(r.heure_estimee)}</p>`;
+    $('resultat').innerHTML = `<p class="detail">N° d'attente à donner au chauffeur</p><div class="numero ${type}">${esc(r.numero)}</div>${texte}`;
+    $('modale-resultat').hidden = false;
+  }
+
+  // --- Actions (délégation de clics) ----------------------------------
+  document.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-fermer]')) { e.target.closest('.modale-fond').hidden = true; return; }
+    const b = e.target.closest('[data-action]');
+    if (!b) {
+      const ligne = e.target.closest('[data-ligne]');
+      if (ligne) { E.ouverte = E.ouverte === ligne.dataset.ligne ? null : ligne.dataset.ligne; rendreFile(); rendreReportes(); }
+      return;
+    }
+    const { action, quai, id, numero } = b.dataset;
+    b.disabled = true;
+    try {
+      if (action === 'appeler') {
+        const r = await App.rpc('fn_appeler_suivant', { p_quai: quai });
+        App.toast(r.appele ? `${r.numero} (${r.plaque}) appelé au quai ${quai === 'FRAIS' ? 'frais' : 'PGC'}` : r.message, r.appele ? 'ok' : 'info');
+      } else if (action === 'debut') {
+        await App.rpc('fn_debut_reception', { p_quai: quai });
+        App.toast('Réception démarrée');
+      } else if (action === 'liberer') {
+        if (!confirm('Confirmer la fin de réception et libérer le quai ?')) return;
+        await App.rpc('fn_liberer_quai', { p_quai: quai });
+        App.toast('Quai libéré');
+      } else if (action === 'forcer') {
+        if (!confirm(`Faire entrer ce camion au quai ${quai === 'FRAIS' ? 'frais' : 'PGC'} en passant devant la file ?`)) return;
+        const r = await App.rpc('fn_forcer_entree', { p_camion: id, p_quai: quai });
+        App.toast(`${r.numero} envoyé au quai ${quai === 'FRAIS' ? 'frais' : 'PGC'}`);
+        E.ouverte = null;
+      } else if (action === 'modifier') {
+        const c = E.file.find(x => x.id === id) || E.reportes.find(x => x.id === id);
+        if (c) ouvrirForm(c);
+        return;
+      } else if (action === 'annuler') {
+        const motif = prompt(`Annuler ${numero} ? Motif (facultatif) :`, '');
+        if (motif === null) return;
+        await App.rpc('fn_annuler_camion', { p_camion: id, p_motif: motif || null });
+        App.toast(`${numero} annulé`, 'info');
+        E.ouverte = null;
+      }
+      charger();
+    } catch (err) { App.erreur(err); }
+    finally { b.disabled = false; }
+  });
+
+  $('onglets').addEventListener('click', (e) => {
+    const o = e.target.closest('[data-filtre]');
+    if (!o) return;
+    E.filtre = o.dataset.filtre;
+    document.querySelectorAll('.onglet').forEach(x => x.classList.toggle('actif', x === o));
+    rendreFile();
+  });
+  $('btn-enregistrer').addEventListener('click', () => ouvrirForm(null));
+  $('btn-deconnexion').addEventListener('click', () => App.deconnexion());
+  $('f-plaque').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase(); });
+
+  // --- Démarrage -------------------------------------------------------
+  (async () => {
+    const profil = await App.exigerConnexion(['securite']);
+    if (!profil) return;
+    $('utilisateur').textContent = profil.nom === App.ROLES[profil.role] || profil.role === 'securite' ? profil.nom : `${profil.nom} · ${App.ROLES[profil.role]}`;
+    const { data } = await sb.from('parametres').select('*').single();
+    E.params = data;
+    tic();
+    setInterval(tic, 1000);
+    await charger();
+    App.ecouter(['camions', 'quais', 'notifications'], charger);
+    setInterval(rendreQuais, 30000);   // chronomètres des quais
+    setInterval(charger, 60000);       // filet de sécurité si le temps réel coupe
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101828">
+  <title>Flux Camions — Connexion</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="connexion">
+    <form id="form-connexion" class="carte" autocomplete="on">
+      <p class="logo">🚚 Flux Camions<small>Réception marchandises</small></p>
+      <div id="message" class="message" hidden></div>
+      <div class="champ">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required>
+      </div>
+      <div class="champ">
+        <label for="mdp">Mot de passe</label>
+        <input id="mdp" type="password" autocomplete="current-password" required>
+      </div>
+      <button id="btn-connexion" class="btn btn-principal btn-grand" type="submit">Se connecter</button>
+    </form>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="commun.js"></script>
+  <script>
+    const msg = document.getElementById('message');
+    const afficher = (texte, type = 'err') => { msg.textContent = texte; msg.className = 'message ' + type; msg.hidden = false; };
+
+    async function orienter(profil) {
+      const page = App.PAGES[profil.role];
+      if (page) { location.replace(page); return; }
+      afficher(`Connecté : ${profil.nom} (${App.ROLES[profil.role]}). Votre écran sera disponible à l'étape suivante.`, 'info');
+      const btn = document.getElementById('btn-connexion');
+      btn.textContent = 'Se déconnecter';
+      btn.type = 'button';
+      btn.onclick = () => App.deconnexion();
+    }
+
+    (async () => {
+      if (new URLSearchParams(location.search).get('e') === 'role') afficher('Cet écran n\'est pas autorisé pour votre compte.');
+      const profil = await App.chargerProfil();
+      if (profil) orienter(profil);
+    })();
+
+    document.getElementById('form-connexion').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (e.target.querySelector('#btn-connexion').type === 'button') return;
+      const btn = document.getElementById('btn-connexion');
+      btn.disabled = true; btn.textContent = 'Connexion…';
+      try {
+        const { error } = await sb.auth.signInWithPassword({
+          email: document.getElementById('email').value.trim(),
+          password: document.getElementById('mdp').value
+        });
+        if (error) throw error;
+        const profil = await App.chargerProfil();
+        if (!profil) {
+          await sb.auth.signOut();
+          throw new Error('Ce compte n\'a pas accès à Flux Camions');
+        }
+        orienter(profil);
+      } catch (err) {
+        afficher(err.message === 'Invalid login credentials' ? 'Email ou mot de passe incorrect' : err.message);
+      } finally {
+        btn.disabled = false;
+        if (btn.type === 'submit') btn.textContent = 'Se connecter';
+      }
+    });
+  </script>
+</body>
+</html>
