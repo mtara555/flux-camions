@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0f17">
+  <title>Flux Camions — Grand écran</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* ===== Grand écran : thème sombre, lisible à distance ===== */
+    body.tv {
+      --tv-fond: #0b0f17; --tv-carte: #141a25; --tv-bord: #232c3b; --tv-texte: #f2f4f7; --tv-texte-2: #98a2b3;
+      --tv-frais: #2e90fa; --tv-frais-fond: #0b2545; --tv-pgc: #f79009; --tv-pgc-fond: #3d2303;
+      --tv-ok: #32d583; --tv-alerte: #f04438; --tv-attention: #fdb022;
+      background: var(--tv-fond); color: var(--tv-texte);
+      height: 100vh; overflow: hidden; font-size: clamp(14px, 1.15vw, 28px);
+      display: grid; grid-template-rows: auto 1fr auto;
+    }
+    .tv-tete {
+      display: flex; align-items: center; gap: 1.2em; padding: .7em 1.4em;
+      border-bottom: 1px solid var(--tv-bord);
+    }
+    .tv-tete h1 { margin: 0; font-size: 1.5em; font-weight: 800; letter-spacing: -.01em; }
+    .tv-tete .mag { color: var(--tv-texte-2); font-size: .95em; }
+    .tv-tete .espace { flex: 1; }
+    .tv-heure { font-size: 2.4em; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+    .tv-date { color: var(--tv-texte-2); text-align: right; font-size: .9em; line-height: 1.2; }
+    .tv-ouv { font-weight: 700; padding: .3em .9em; border-radius: 99px; font-size: .95em; }
+    .tv-ouv.ouvert { background: rgba(50,213,131,.15); color: var(--tv-ok); }
+    .tv-ouv.ferme { background: rgba(240,68,56,.15); color: var(--tv-alerte); }
+    #pastille-direct { width: .6em; height: .6em; }
+
+    .tv-corps { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2em; padding: 1.2em 1.4em; min-height: 0; }
+    .piste { display: grid; grid-template-rows: auto 1fr; gap: 1em; min-height: 0; }
+    .tv-quai {
+      background: var(--tv-carte); border: 1px solid var(--tv-bord); border-radius: 1em; padding: 1.1em 1.3em;
+      border-top: .45em solid; display: grid; gap: .6em; min-height: 11em;
+    }
+    .frais .tv-quai { border-top-color: var(--tv-frais); }
+    .pgc .tv-quai { border-top-color: var(--tv-pgc); }
+    .tv-quai.depasse { border-color: var(--tv-alerte); box-shadow: 0 0 0 .2em rgba(240,68,56,.35); }
+    .tv-quai-tete { display: flex; justify-content: space-between; align-items: center; }
+    .tv-quai-tete h2 { margin: 0; font-size: 1.5em; }
+    .tv-statut { font-weight: 800; text-transform: uppercase; letter-spacing: .04em; font-size: .9em; padding: .3em .8em; border-radius: 99px; }
+    .tv-statut.libre { background: rgba(50,213,131,.15); color: var(--tv-ok); }
+    .tv-statut.appele { background: rgba(253,176,34,.18); color: var(--tv-attention); animation: clign 1s steps(2) infinite; }
+    .tv-statut.occupe { background: rgba(255,255,255,.08); color: var(--tv-texte); }
+    .tv-statut.depasse { background: var(--tv-alerte); color: #fff; }
+    @keyframes clign { 50% { opacity: .35; } }
+    .tv-camion { display: flex; align-items: center; gap: 1em; }
+    .tv-num {
+      font-size: 3.6em; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1;
+      padding: .12em .3em; border-radius: .2em; letter-spacing: -.02em;
+    }
+    .frais .tv-num, .tv-num.frais { background: var(--tv-frais-fond); color: var(--tv-frais); }
+    .pgc .tv-num, .tv-num.pgc { background: var(--tv-pgc-fond); color: var(--tv-pgc); }
+    .tv-plaque { font-size: 1.6em; font-weight: 800; letter-spacing: .04em; }
+    .tv-sec { color: var(--tv-texte-2); }
+    .tv-libre { font-size: 1.6em; color: var(--tv-ok); font-weight: 700; padding: .6em 0; }
+    .tv-jauge { height: .5em; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+    .tv-jauge span { display: block; height: 100%; background: var(--tv-ok); }
+    .tv-jauge.depasse span { background: var(--tv-alerte); }
+
+    .tv-file { background: var(--tv-carte); border: 1px solid var(--tv-bord); border-radius: 1em; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+    .tv-file h3 { margin: 0; padding: .8em 1.2em; font-size: 1.1em; color: var(--tv-texte-2); text-transform: uppercase; letter-spacing: .06em; display: flex; justify-content: space-between; }
+    .tv-file ol { list-style: none; margin: 0; padding: 0; overflow: hidden; flex: 1; }
+    .tv-file li {
+      display: grid; grid-template-columns: auto 1fr auto; gap: 1em; align-items: center;
+      padding: .55em 1.2em; border-top: 1px solid var(--tv-bord);
+    }
+    .tv-file li .tv-num { font-size: 1.7em; min-width: 3.4em; text-align: center; }
+    .tv-file .tv-plaque { font-size: 1.15em; }
+    .tv-file .tv-est { font-size: 1.8em; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+    .tv-file .tv-est small { display: block; font-size: .45em; font-weight: 600; color: var(--tv-texte-2); text-transform: uppercase; letter-spacing: .05em; }
+    .tv-tags { display: flex; gap: .4em; flex-wrap: wrap; margin-top: .2em; }
+    .tv-tag { font-size: .72em; font-weight: 800; padding: .15em .55em; border-radius: .35em; background: rgba(255,255,255,.08); color: var(--tv-texte-2); text-transform: uppercase; letter-spacing: .03em; }
+    .tv-tag.prio { background: rgba(240,68,56,.18); color: #fda29b; }
+    .tv-tag.redir { background: var(--tv-frais); color: #fff; }
+    .tv-vide { padding: 1.6em 1.2em; color: var(--tv-texte-2); border-top: 1px solid var(--tv-bord); font-size: 1.1em; }
+    .tv-plus { padding: .6em 1.2em; color: var(--tv-texte-2); border-top: 1px solid var(--tv-bord); }
+
+    .tv-pied { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--tv-bord); }
+    .tv-kpi { padding: .7em 1.4em; display: flex; align-items: baseline; gap: .6em; }
+    .tv-kpi + .tv-kpi { border-left: 1px solid var(--tv-bord); }
+    .tv-kpi b { font-size: 2em; font-variant-numeric: tabular-nums; }
+    .tv-kpi span { color: var(--tv-texte-2); }
+
+    /* Annonce plein écran à l'appel */
+    .annonce {
+      position: fixed; inset: 0; z-index: 60; display: grid; place-content: center; text-align: center; gap: .3em;
+      animation: entree .4s ease-out;
+    }
+    .annonce.frais { background: #06325f; }
+    .annonce.pgc { background: #5a3300; }
+    .annonce .a-titre { font-size: 2.4em; font-weight: 700; opacity: .85; text-transform: uppercase; letter-spacing: .08em; }
+    .annonce .a-num { font-size: 12em; font-weight: 900; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+    .annonce .a-quai { font-size: 4em; font-weight: 900; }
+    .annonce .a-plaque { font-size: 2.2em; opacity: .85; letter-spacing: .05em; }
+    @keyframes entree { from { opacity: 0; transform: scale(1.04); } }
+
+    /* Démarrage (son + plein écran nécessitent un clic) */
+    .demarrage { position: fixed; inset: 0; z-index: 70; background: rgba(11,15,23,.92); display: grid; place-content: center; gap: 1em; text-align: center; }
+    .demarrage button { font-size: 1.4em; padding: .8em 1.6em; border-radius: .6em; border: 0; background: #fff; color: #0b0f17; font-weight: 800; }
+    .demarrage p { color: var(--tv-texte-2); margin: 0; }
+    .tv .btn-lien { font-size: .8em; }
+  </style>
+</head>
+<body class="tv">
+  <header class="tv-tete">
+    <div>
+      <h1>🚚 Réception marchandises</h1>
+      <div class="mag" id="magasin"></div>
+    </div>
+    <span id="pastille-direct" title="Temps réel"></span>
+    <span class="espace"></span>
+    <span id="nav"></span>
+    <span class="tv-ouv" id="ouverture">—</span>
+    <div class="tv-date" id="date"></div>
+    <span class="tv-heure" id="heure">--:--</span>
+  </header>
+
+  <section class="tv-corps">
+    <div class="piste frais">
+      <article class="tv-quai" id="quai-FRAIS"></article>
+      <div class="tv-file"><h3><span>❄️ File Frais</span><span id="nb-FRAIS">0</span></h3><ol id="file-FRAIS"></ol></div>
+    </div>
+    <div class="piste pgc">
+      <article class="tv-quai" id="quai-PGC"></article>
+      <div class="tv-file"><h3><span>📦 File PGC / NF</span><span id="nb-PGC">0</span></h3><ol id="file-PGC"></ol></div>
+    </div>
+  </section>
+
+  <footer class="tv-pied">
+    <div class="tv-kpi"><b id="k-attente">0</b><span>camions en attente</span></div>
+    <div class="tv-kpi"><b id="k-recus">0</b><span>reçus aujourd'hui</span></div>
+    <div class="tv-kpi"><b id="k-moy">—</b><span>attente moyenne</span></div>
+    <div class="tv-kpi"><b id="k-report">0</b><span>reportés</span></div>
+  </footer>
+
+  <div class="annonce" id="annonce" hidden></div>
+  <div class="demarrage" id="demarrage">
+    <button id="btn-demarrer">▶ Démarrer l'affichage</button>
+    <p>Active le son des annonces, le plein écran et empêche la mise en veille.</p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="commun.js"></script>
+  <script>
+  // =====================================================================
+  //  GRAND ÉCRAN RÉCEPTION (lecture seule, temps réel)
+  // =====================================================================
+  const $ = (id) => document.getElementById(id);
+  const esc = App.echapper;
+  const LIB_TAILLE = { camionnette: 'Camionnette', porteur: '', semi: 'Semi' };
+  const E = { quais: [], file: [], jour: [], aff: [], reportes: 0, params: null, precedents: null, audio: null, wake: null, minuteurAnnonce: null };
+
+  function jourLocal() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Casablanca' });   // AAAA-MM-JJ
+  }
+
+  async function charger() {
+    try {
+      const [q, f, c, a, r] = await Promise.all([
+        sb.from('v_quais').select('*').order('id'),
+        sb.from('v_file').select('*').order('heure_estimee').order('heure_arrivee'),
+        sb.from('camions').select('id,statut,heure_arrivee').eq('jour', jourLocal()),
+        sb.from('affectations').select('camion_id,heure_appel,heure_fin').gte('heure_appel', App.debutJour()),
+        sb.from('camions').select('id').eq('statut', 'reporte')
+      ]);
+      for (const x of [q, f, c, a, r]) if (x.error) throw x.error;
+      E.quais = q.data; E.file = f.data; E.jour = c.data; E.aff = a.data; E.reportes = r.data.length;
+      detecterAppels();
+      rendre();
+    } catch (e) { App.erreur(e); }
+  }
+
+  // Un camion vient d'être appelé → annonce plein écran + carillon
+  function detecterAppels() {
+    const actuels = Object.fromEntries(E.quais.map(q => [q.id, q.statut === 'appele' ? q.camion_id : null]));
+    if (E.precedents) {
+      for (const q of E.quais) {
+        if (q.statut === 'appele' && q.camion_id !== E.precedents[q.id]) annoncer(q);
+      }
+    }
+    E.precedents = actuels;
+  }
+
+  function annoncer(q) {
+    const a = $('annonce');
+    a.className = 'annonce ' + (q.id === 'FRAIS' ? 'frais' : 'pgc');
+    a.innerHTML = `<div class="a-titre">Camion appelé</div>
+                   <div class="a-num">${esc(q.numero)}</div>
+                   <div class="a-quai">→ QUAI ${q.id === 'FRAIS' ? 'FRAIS' : 'PGC / NF'}</div>
+                   <div class="a-plaque">${esc(q.plaque)}${q.fournisseur ? ' · ' + esc(q.fournisseur) : ''}</div>`;
+    a.hidden = false;
+    carillon();
+    clearTimeout(E.minuteurAnnonce);
+    E.minuteurAnnonce = setTimeout(() => { a.hidden = true; }, 12000);
+  }
+
+  function carillon() {
+    if (!E.audio) return;
+    [659, 523, 784].forEach((f, i) => {
+      const o = E.audio.createOscillator(), g = E.audio.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      const t = E.audio.currentTime + i * 0.45;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.5, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+      o.connect(g).connect(E.audio.destination);
+      o.start(t); o.stop(t + 1);
+    });
+  }
+
+  // --- Affichage -------------------------------------------------------
+  function rendre() {
+    E.quais.forEach(rendreQuai);
+    ['FRAIS', 'PGC'].forEach(rendreFile);
+    rendreKpi();
+  }
+
+  function rendreQuai(q) {
+    const el = $('quai-' + q.id);
+    if (!el) return;
+    const depasse = q.statut === 'occupe' && App.minutesDepuis(q.heure_debut) > q.duree_prevue_min;
+    const lib = depasse ? 'Dépassement' : { libre: 'Libre', appele: 'Camion appelé', occupe: 'En réception' }[q.statut];
+    let corps;
+    if (q.statut === 'libre') {
+      corps = `<div class="tv-libre">✓ Quai disponible</div>`;
+    } else {
+      const ecoule = q.statut === 'occupe' ? App.minutesDepuis(q.heure_debut) : App.minutesDepuis(q.heure_appel);
+      const pct = q.statut === 'occupe' ? Math.min(100, Math.round(ecoule / q.duree_prevue_min * 100)) : 0;
+      corps = `
+        <div class="tv-camion">
+          <span class="tv-num ${q.type}">${esc(q.numero)}</span>
+          <div>
+            <div class="tv-plaque">${esc(q.plaque)}</div>
+            <div class="tv-sec">${esc(q.fournisseur || '')}</div>
+          </div>
+        </div>
+        <div class="tv-sec">${q.statut === 'occupe'
+          ? `En réception depuis ${App.duree(ecoule)} · prévu ${App.duree(q.duree_prevue_min)} · fin estimée ${App.hhmm(new Date(new Date(q.heure_debut).getTime() + q.duree_prevue_min * 60000))}`
+          : `Appelé à ${App.hhmm(q.heure_appel)} — en approche du quai`}</div>
+        ${q.statut === 'occupe' ? `<div class="tv-jauge ${depasse ? 'depasse' : ''}"><span style="width:${pct}%"></span></div>` : ''}`;
+    }
+    el.className = 'tv-quai' + (depasse ? ' depasse' : '');
+    el.innerHTML = `
+      <div class="tv-quai-tete">
+        <h2>${q.id === 'FRAIS' ? '❄️' : '📦'} ${esc(q.libelle)}</h2>
+        <span class="tv-statut ${depasse ? 'depasse' : q.statut}">${lib}</span>
+      </div>${corps}`;
+  }
+
+  function rendreFile(piste) {
+    const liste = E.file.filter(c => c.piste_cible === piste);
+    const ol = $('file-' + piste);
+    $('nb-' + piste).textContent = liste.length;
+    if (!liste.length) { ol.innerHTML = `<li class="tv-vide" style="display:block">Aucun camion en attente</li>`; return; }
+    const ligne = (c) => {
+      const redir = c.type === 'pgc' && piste === 'FRAIS';
+      return `
+      <li>
+        <span class="tv-num ${c.type}">${esc(c.numero)}</span>
+        <div>
+          <div class="tv-plaque">${esc(c.plaque)}</div>
+          <div class="tv-tags">
+            ${c.prioritaire ? '<span class="tv-tag prio">Prioritaire</span>' : ''}
+            ${redir ? '<span class="tv-tag redir">Camionnette PGC</span>' : ''}
+            ${!redir && LIB_TAILLE[c.taille] ? `<span class="tv-tag">${LIB_TAILLE[c.taille]}</span>` : ''}
+            ${c.multi_lignes ? '<span class="tv-tag">Multi-lignes</span>' : ''}
+            ${c.mode === 'enlevement' ? '<span class="tv-tag">Retour</span>' : ''}
+          </div>
+        </div>
+        <div class="tv-est"><small>Entrée estimée</small>${App.hhmm(c.heure_estimee)}</div>
+      </li>`;
+    };
+    const plus = (n) => `<li class="tv-plus" style="display:block">+ ${n} autre${n > 1 ? 's' : ''} camion${n > 1 ? 's' : ''}</li>`;
+    // Affiche autant de lignes que la hauteur de l'écran le permet, puis « + N autres »
+    let n = liste.length;
+    ol.innerHTML = liste.map(ligne).join('');
+    while (n > 1 && ol.scrollHeight > ol.clientHeight + 1) {
+      n--;
+      ol.innerHTML = liste.slice(0, n).map(ligne).join('') + plus(liste.length - n);
+    }
+  }
+
+  function rendreKpi() {
+    $('k-attente').textContent = E.file.length;
+    $('k-recus').textContent = E.jour.filter(c => c.statut === 'termine').length;
+    $('k-report').textContent = E.reportes;
+    const arrivee = Object.fromEntries(E.jour.map(c => [c.id, c.heure_arrivee]));
+    const attentes = E.aff.filter(a => arrivee[a.camion_id])
+      .map(a => Math.max(0, (new Date(a.heure_appel) - new Date(arrivee[a.camion_id])) / 60000));
+    $('k-moy').textContent = attentes.length ? App.duree(Math.round(attentes.reduce((s, x) => s + x, 0) / attentes.length)) : '—';
+  }
+
+  function tic() {
+    const now = new Date();
+    const h = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Africa/Casablanca' });
+    $('heure').textContent = h.slice(0, 5);
+    $('date').innerHTML = now.toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'Africa/Casablanca' }) + '<br>' +
+      now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Africa/Casablanca' });
+    if (E.params) {
+      const ouvert = h >= E.params.heure_ouverture && h < E.params.heure_fermeture;
+      const o = $('ouverture');
+      o.className = 'tv-ouv ' + (ouvert ? 'ouvert' : 'ferme');
+      o.textContent = ouvert ? `Ouvert jusqu'à ${E.params.heure_fermeture.slice(0, 5).replace(':', 'h')}`
+                             : `Fermé · ouverture ${E.params.heure_ouverture.slice(0, 5).replace(':', 'h')}`;
+    }
+  }
+
+  async function demarrer() {
+    try { E.audio = new (window.AudioContext || window.webkitAudioContext)(); await E.audio.resume(); } catch (e) {}
+    try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e) {}
+    try { if ('wakeLock' in navigator) E.wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+    $('demarrage').hidden = true;
+  }
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+      try { if ('wakeLock' in navigator && E.audio) E.wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+      charger();
+    }
+  });
+  $('btn-demarrer').addEventListener('click', demarrer);
+  window.addEventListener('resize', () => ['FRAIS', 'PGC'].forEach(rendreFile));
+  document.addEventListener('fullscreenchange', () => setTimeout(() => ['FRAIS', 'PGC'].forEach(rendreFile), 200));
+  $('annonce').addEventListener('click', () => { $('annonce').hidden = true; });
+
+  // --- Démarrage -------------------------------------------------------
+  (async () => {
+    const profil = await App.exigerConnexion(['ecran', 'securite']);
+    if (!profil) return;
+    App.navigation('ecran.html');
+    $('magasin').textContent = CONFIG.MAGASIN || '';
+    const { data } = await sb.from('parametres').select('*').single();
+    E.params = data;
+    tic(); setInterval(tic, 1000);
+    await charger();
+    App.ecouter(['camions', 'quais'], charger);
+    setInterval(() => E.quais.forEach(rendreQuai), 30000);   // chronomètres
+    setInterval(charger, 30000);                              // filet de sécurité
+    setTimeout(() => location.reload(), 6 * 3600 * 1000);     // rafraîchissement complet toutes les 6 h
+  })();
+  </script>
+</body>
+</html>
