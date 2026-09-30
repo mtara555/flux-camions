@@ -22,7 +22,7 @@ const App = {
   navigation(courante) {
     const zone = document.getElementById('nav');
     if (!zone || !App.profil || App.profil.role !== 'responsable') return;
-    const pages = [['securite.html', 'Portail'], ['equipe.html', 'Équipes'], ['ecran.html', 'Grand écran'], ['qr.html', 'Affiche QR']];
+    const pages = [['securite.html', 'Portail'], ['equipe.html', 'Équipes'], ['ecran.html', 'Grand écran'], ['qr.html', 'Affiche QR'], ['sms.html', 'SMS']];
     zone.innerHTML = pages.filter(([p]) => p !== courante)
       .map(([p, lib]) => `<a class="btn-lien" href="${p}">${lib}</a>`).join('');
   },

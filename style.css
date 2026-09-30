@@ -65,6 +65,7 @@ button { cursor: pointer; }
 
 /* --- Mise en page ---------------------------------------------------- */
 main { padding: 16px; max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+main > * { min-width: 0; }
 .carte {
   background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon);
   box-shadow: var(--ombre);
@@ -220,7 +221,8 @@ main { padding: 16px; max-width: 1280px; margin: 0 auto; display: grid; gap: 16p
 
 
 /* --- Navigation responsable ------------------------------------------ */
-#nav { display: flex; gap: 6px; }
+#nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+#nav::-webkit-scrollbar { display: none; }
 #nav a { text-decoration: none; }
 
 /* --- Écran équipes --------------------------------------------------- */
@@ -255,6 +257,7 @@ main { padding: 16px; max-width: 1280px; margin: 0 auto; display: grid; gap: 16p
   .barre h1 { font-size: 16px; }
   .horloge { font-size: 18px; }
   .etat-ouverture .plage { display: none; }
+  #nav { max-width: 42vw; }
   .btn-lien { padding: 6px 8px; font-size: 13px; }
   .ligne { grid-template-columns: auto 1fr; }
   .ligne-temps { grid-column: 1 / -1; display: flex; gap: 8px; align-items: baseline; justify-content: flex-start; text-align: left; }

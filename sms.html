@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101828">
+  <title>Flux Camions — SMS</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); }
+    .kpis div { padding: 14px 16px; border-top: 1px solid var(--bord); }
+    .kpis div + div { border-left: 1px solid var(--bord); }
+    .kpis b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; }
+    .kpis span { color: var(--texte-2); font-size: 13px; }
+    .form { padding: 0 16px 16px; display: grid; gap: 12px; }
+    .ligne-form { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+    .ligne-form .champ { flex: 1; min-width: 220px; }
+    .secret { font-family: ui-monospace, monospace; background: var(--neutre); padding: 10px 12px; border-radius: 10px; word-break: break-all; font-size: 14px; }
+    .interrupteur { display: flex; align-items: center; gap: 10px; font-weight: 600; min-height: 48px; }
+    .interrupteur input { width: 24px; height: 24px; accent-color: var(--ok); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 12px; border-top: 1px solid var(--bord); vertical-align: top; }
+    th { color: var(--texte-2); font-weight: 600; font-size: 13px; }
+    td.msg { max-width: 420px; }
+    .st { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; text-transform: uppercase; white-space: nowrap; }
+    .st.envoye { background: var(--ok-clair); color: var(--ok); }
+    .st.echec { background: var(--alerte-clair); color: var(--alerte); }
+    .st.a_envoyer, .st.en_cours { background: var(--attention-clair); color: var(--attention); }
+    .err { color: var(--alerte); font-size: 12px; }
+    .tableau { overflow-x: auto; }
+    .aide { padding: 0 16px 16px; font-size: 14px; color: var(--texte-2); }
+    .aide ol { margin: 6px 0 0; padding-left: 20px; }
+    @media (max-width: 700px) { .kpis { grid-template-columns: 1fr 1fr 1fr; } td.msg { min-width: 220px; } }
+  </style>
+</head>
+<body>
+  <header class="barre">
+    <div><h1>SMS chauffeurs</h1><div class="sous" id="utilisateur">…</div></div>
+    <span class="espace"></span>
+    <span id="nav"></span>
+    <button class="btn-lien" id="btn-deconnexion">Quitter</button>
+  </header>
+
+  <main>
+    <!-- État -->
+    <section class="carte">
+      <div class="titre-section"><h2>État des envois</h2><span class="statut" id="etat">—</span></div>
+      <div class="kpis">
+        <div><b id="k-env">0</b><span>envoyés (24 h)</span></div>
+        <div><b id="k-att">0</b><span>en attente</span></div>
+        <div><b id="k-ech">0</b><span>échecs (24 h)</span></div>
+      </div>
+    </section>
+
+    <!-- Configuration -->
+    <section class="carte">
+      <div class="titre-section"><h2>Configuration</h2></div>
+      <form class="form" id="form-config">
+        <div class="champ">
+          <label for="f-url">Adresse de la fonction d'envoi</label>
+          <input id="f-url" type="text" placeholder="https://xxxx.supabase.co/functions/v1/flux-sms" autocomplete="off" style="font-size:15px">
+        </div>
+        <label class="interrupteur"><input type="checkbox" id="f-actif"> Envoi automatique des SMS activé</label>
+        <div class="champ">
+          <span class="etiquette">Secret de liaison (déjà transmis automatiquement à la fonction — rien à copier)</span>
+          <div class="secret" id="secret">—</div>
+        </div>
+        <button class="btn btn-principal" type="submit">Enregistrer la configuration</button>
+      </form>
+    </section>
+
+    <!-- Test -->
+    <section class="carte">
+      <div class="titre-section"><h2>Envoyer un SMS de test</h2></div>
+      <form class="form" id="form-test">
+        <div class="ligne-form">
+          <div class="champ"><label for="f-tel">Numéro</label><input id="f-tel" type="tel" placeholder="06 00 00 00 00" inputmode="tel"></div>
+          <button class="btn btn-ok" type="submit">Envoyer le test</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Historique -->
+    <section class="carte">
+      <div class="titre-section">
+        <h2>Derniers SMS</h2>
+        <button class="btn btn-petit" id="btn-relancer">↻ Relancer les échecs</button>
+      </div>
+      <div class="tableau">
+        <table>
+          <thead><tr><th>Heure</th><th>N°</th><th>Téléphone</th><th>Message</th><th>État</th></tr></thead>
+          <tbody id="historique"></tbody>
+        </table>
+      </div>
+      <div class="aide">
+        En cas d'échec, le message d'erreur du fournisseur s'affiche sous l'état. Les SMS de plus de 3 h ne sont jamais envoyés
+        (information périmée).
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="commun.js"></script>
+  <script>
+  const $ = (id) => document.getElementById(id);
+  const esc = App.echapper;
+  const LIB = { a_envoyer: 'À envoyer', en_cours: 'En cours', envoye: 'Envoyé', echec: 'Échec' };
+
+  async function charger() {
+    try {
+      const [cfg, h] = await Promise.all([
+        App.rpc('fn_sms_config'),
+        sb.from('notifications').select('*').eq('canal', 'sms').order('created_at', { ascending: false }).limit(40)
+      ]);
+      if (h.error) throw h.error;
+      if (document.activeElement !== $('f-url')) $('f-url').value = cfg.url_fonction || '';
+      $('f-actif').checked = cfg.actif;
+      $('secret').textContent = cfg.secret;
+      $('k-env').textContent = cfg.envoyes_24h;
+      $('k-att').textContent = cfg.en_attente;
+      $('k-ech').textContent = cfg.echecs_24h;
+      const etat = $('etat');
+      etat.className = 'statut ' + (cfg.actif && cfg.url_fonction ? 'libre' : 'depasse');
+      etat.textContent = cfg.actif && cfg.url_fonction ? 'Actif' : 'Désactivé';
+
+      const ids = [...new Set(h.data.map(n => n.camion_id).filter(Boolean))];
+      let nums = {};
+      if (ids.length) {
+        const c = await sb.from('camions').select('id,numero').in('id', ids);
+        if (!c.error) nums = Object.fromEntries(c.data.map(x => [x.id, x.numero]));
+      }
+      $('historique').innerHTML = h.data.length ? h.data.map(n => `
+        <tr>
+          <td>${App.hhmm(n.created_at)}<br><span class="detail">${new Date(n.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</span></td>
+          <td><b>${esc(nums[n.camion_id] || (n.type === 'test' ? 'Test' : '—'))}</b></td>
+          <td>${esc(n.destinataire)}</td>
+          <td class="msg">${esc(n.message)}</td>
+          <td><span class="st ${n.statut}">${LIB[n.statut] || n.statut}</span>${n.erreur ? `<div class="err">${esc(n.erreur)}</div>` : ''}</td>
+        </tr>`).join('') : `<tr><td colspan="5" class="vide">Aucun SMS pour l'instant</td></tr>`;
+    } catch (e) { App.erreur(e); }
+  }
+
+  $('form-config').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await App.rpc('fn_sms_configurer', { p_url: $('f-url').value.trim() || null, p_actif: $('f-actif').checked });
+      App.toast('Configuration enregistrée');
+      charger();
+    } catch (err) { App.erreur(err); }
+  });
+  $('form-test').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await App.rpc('fn_sms_test', { p_telephone: $('f-tel').value });
+      App.toast('SMS de test demandé — état mis à jour dans quelques secondes', 'info');
+      setTimeout(charger, 800); setTimeout(charger, 5000);
+    } catch (err) { App.erreur(err); }
+  });
+  $('btn-relancer').addEventListener('click', async () => {
+    try {
+      const n = await App.rpc('fn_sms_relancer');
+      App.toast(n ? `${n} SMS relancé${n > 1 ? 's' : ''}` : 'Aucun échec à relancer', n ? 'ok' : 'info');
+      setTimeout(charger, 800); setTimeout(charger, 5000);
+    } catch (err) { App.erreur(err); }
+  });
+  $('btn-deconnexion').addEventListener('click', () => App.deconnexion());
+
+  (async () => {
+    const profil = await App.exigerConnexion([]);   // responsable uniquement
+    if (!profil) return;
+    $('utilisateur').textContent = profil.nom;
+    App.navigation('sms.html');
+    await charger();
+    App.ecouter(['notifications'], charger);
+    setInterval(charger, 30000);
+  })();
+  </script>
+</body>
+</html>
